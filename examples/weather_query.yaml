@@ -1,0 +1,30 @@
+test_id: "weather_query"
+description: "Agent should handle weather queries appropriately"
+conversations:
+  - name: "new_york_weather"
+    turns:
+      - role: "user"
+        content: "What's the weather like in New York?"
+      - role: "agent"
+        assertions:
+          - type: "contains"
+            value: "weather"
+          - type: "excludes"
+            value: "I don't know"
+          - type: "max_length"
+            value: 300
+  
+  - name: "no_location_weather"
+    turns:
+      - role: "user"
+        content: "What's the weather?"
+      - role: "agent"
+        assertions:
+          - type: "any_of"
+            value:
+              - type: "contains"
+                value: "location"
+              - type: "contains"
+                value: "where"
+              - type: "contains"
+                value: "city"

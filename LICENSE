@@ -1,0 +1,174 @@
+testLLM Framework License
+Version 1.0, 2025
+
+Copyright (c) 2025 testLLM Team
+
+TERMS AND CONDITIONS
+
+1. DEFINITIONS
+
+"Framework" refers to the testLLM software library, including all source code,
+documentation, and associated materials.
+
+"Free Tier" refers to the basic usage of the Framework without payment.
+
+"Premium Tier" refers to the paid diagnostic and inspection services.
+
+"Test Data" refers to inputs, outputs, assertions, and metadata generated 
+during test execution.
+
+"Company" refers to the testLLM Team and its authorized representatives.
+
+"User" refers to any individual or organization using the Framework.
+
+2. GRANT OF LICENSE
+
+2.1 Free Tier License
+Subject to the terms of this license, Company hereby grants User a worldwide,
+royalty-free, non-exclusive license to:
+- Use the Framework for testing LLM-based agents
+- Modify the Framework for User's internal purposes
+- Distribute the Framework provided this license is included
+
+2.2 Restrictions
+User may NOT:
+- Remove or modify this license
+- Use the Framework for commercial redistribution without written permission
+- Reverse engineer the Premium Tier diagnostic services
+- Interfere with or bypass the data collection mechanisms
+
+3. DATA COLLECTION AND USAGE
+
+3.1 Free Tier Data Collection
+By using the Framework, User acknowledges and consents that:
+- Test Data is automatically collected and transmitted to Company servers
+- Collection includes test inputs, agent outputs, assertion results, and metadata
+- Data is used for service improvement, analytics, and diagnostic purposes
+- User retains ownership of their original test definitions and agent implementations
+
+3.2 Data Processing Rights
+Company may:
+- Process Test Data to improve the Framework
+- Generate aggregated analytics and insights
+- Use Test Data for machine learning and research purposes
+- Store Test Data indefinitely for service operation
+
+3.3 Data Anonymization
+Company will make reasonable efforts to:
+- Remove personally identifiable information from collected data
+- Aggregate data across multiple users for analysis
+- Implement security measures to protect stored data
+
+4. PREMIUM TIER SERVICES
+
+4.1 Paid Services
+For $5.00 USD per month, Premium Tier subscribers receive:
+- Access to detailed inspection of their historical Test Data
+- Advanced analytics and reporting capabilities
+- Priority support and enhanced features
+- Data retention guarantees
+
+4.2 Premium Data Access
+Premium subscribers may:
+- View their complete Test Data history
+- Export their Test Data in standard formats
+- Delete specific Test Data records (subject to technical limitations)
+- Receive detailed analytics on test patterns and performance
+
+5. PRIVACY AND SECURITY
+
+5.1 Data Security
+Company will implement reasonable security measures to protect Test Data,
+including encryption in transit and at rest.
+
+5.2 Data Sharing
+Company will not share identifiable Test Data with third parties except:
+- As required by law or legal process
+- With User's explicit written consent
+- In aggregated, anonymized form for research or business purposes
+
+5.3 Data Breach Notification
+Company will make reasonable efforts to notify Users of any security breach
+that may compromise their Test Data.
+
+6. DISCLAIMERS AND LIMITATIONS
+
+6.1 WARRANTY DISCLAIMER
+THE FRAMEWORK IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+6.2 LIMITATION OF LIABILITY
+IN NO EVENT SHALL COMPANY BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF
+THE FRAMEWORK OR INABILITY TO USE THE FRAMEWORK.
+
+6.3 Data Loss Disclaimer
+Company does not guarantee the availability, integrity, or recoverability
+of Test Data and is not liable for any data loss.
+
+7. TERMINATION
+
+7.1 Termination Rights
+This license may be terminated:
+- By User at any time by discontinuing use of the Framework
+- By Company for breach of license terms with 30 days written notice
+- Automatically if User fails to comply with data collection requirements
+
+7.2 Effect of Termination
+Upon termination:
+- User's right to use the Framework ceases immediately
+- Company may retain Test Data for operational and legal purposes
+- Premium Tier services are discontinued (with prorated refunds if applicable)
+
+8. INTELLECTUAL PROPERTY
+
+8.1 Framework Ownership
+Company retains all rights, title, and interest in the Framework.
+
+8.2 User Content
+User retains ownership of their original test definitions and agent
+implementations, but grants Company a license to process associated Test Data.
+
+8.3 Derivative Works
+Improvements to the Framework developed using aggregated Test Data become
+the property of Company.
+
+9. COMPLIANCE AND LEGAL
+
+9.1 Data Protection Laws
+Company will make reasonable efforts to comply with applicable data protection
+laws, including GDPR, CCPA, and similar regulations.
+
+9.2 Export Control
+User is responsible for compliance with applicable export control laws.
+
+9.3 Governing Law
+This license is governed by the laws of [JURISDICTION TO BE SPECIFIED].
+
+10. UPDATES AND MODIFICATIONS
+
+10.1 License Updates
+Company may update this license with 30 days notice to Users.
+
+10.2 Continued Use
+Continued use of the Framework after license updates constitutes acceptance
+of the new terms.
+
+11. CONTACT INFORMATION
+
+For questions about this license or data practices:
+Email: legal@testllm.com
+Address: [TO BE SPECIFIED]
+
+12. ACKNOWLEDGMENT
+
+BY INSTALLING, DOWNLOADING, ACCESSING, OR USING THE FRAMEWORK, USER
+ACKNOWLEDGES THAT THEY HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY
+THE TERMS OF THIS LICENSE.
+
+---
+
+This license is designed to protect both User and Company interests while
+enabling the operation of a freemium software service with data collection
+for diagnostic and improvement purposes.
