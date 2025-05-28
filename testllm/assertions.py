@@ -31,7 +31,7 @@ class BaseAssertion(ABC):
 class ContainsAssertion(BaseAssertion):
     """Assert that response contains a specific pattern"""
     
-    def __init__(self, pattern: str, case_sensitive: bool = True):
+    def __init__(self, pattern: str, case_sensitive: bool = False):
         self.pattern = pattern
         self.case_sensitive = case_sensitive
     
@@ -53,7 +53,7 @@ class ContainsAssertion(BaseAssertion):
 class ExcludesAssertion(BaseAssertion):
     """Assert that response excludes a specific pattern"""
     
-    def __init__(self, pattern: str, case_sensitive: bool = True):
+    def __init__(self, pattern: str, case_sensitive: bool = False):
         self.pattern = pattern
         self.case_sensitive = case_sensitive
     
@@ -136,7 +136,8 @@ class SentimentAssertion(BaseAssertion):
     POSITIVE_KEYWORDS = {
         'good', 'great', 'excellent', 'wonderful', 'amazing', 'fantastic', 
         'awesome', 'brilliant', 'perfect', 'love', 'happy', 'glad', 'pleased',
-        'satisfied', 'delighted', 'thrilled', 'excited', 'yes', 'sure', 'absolutely'
+        'satisfied', 'delighted', 'thrilled', 'excited', 'yes', 'sure', 'absolutely',
+        'help', 'assist', 'support', 'welcome', 'here', 'ready', 'available'
     }
     
     NEGATIVE_KEYWORDS = {
@@ -357,12 +358,12 @@ def create_assertion_from_dict(assertion_dict: Dict[str, Any]) -> BaseAssertion:
     if assertion_type == "contains":
         return ContainsAssertion(
             assertion_dict["value"],
-            assertion_dict.get("case_sensitive", True)
+            assertion_dict.get("case_sensitive", False)
         )
     elif assertion_type == "excludes":
         return ExcludesAssertion(
             assertion_dict["value"],
-            assertion_dict.get("case_sensitive", True)
+            assertion_dict.get("case_sensitive", False)
         )
     elif assertion_type == "regex":
         return RegexAssertion(

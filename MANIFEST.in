@@ -1,0 +1,29 @@
+# Include essential files in the package distribution
+include README.md
+include LICENSE
+include ARCHITECTURE.md
+include requirements.txt
+include pyproject.toml
+
+# Include example files
+recursive-include examples *.yaml *.py *.md
+
+# Include test files for development
+recursive-include tests *.py *.yaml
+
+# Exclude build artifacts
+exclude .gitignore
+exclude *.pyc
+exclude __pycache__
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * .pytest_cache
+recursive-exclude * .coverage
+recursive-exclude * htmlcov
+
+# Exclude development files
+exclude .github
+exclude .vscode
+exclude *.egg-info
+exclude build
+exclude dist

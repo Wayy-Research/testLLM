@@ -55,6 +55,7 @@ class ApiAgent(AgentUnderTest):
         self.timeout = timeout
         self.session_id = session_id or f"test_session_{int(time.time())}"
         self.conversation_history: List[Dict[str, str]] = []
+        self._tool_calls: List[Dict[str, Any]] = []
     
     def send_message(self, content: str, context: Optional[Dict[str, Any]] = None) -> str:
         """Send message to API endpoint"""
@@ -107,6 +108,7 @@ class LocalAgent(AgentUnderTest):
         self.model = model
         self.tools = tools or []
         self.conversation_history: List[Dict[str, str]] = []
+        self._tool_calls: List[Dict[str, Any]] = []
     
     def send_message(self, content: str, context: Optional[Dict[str, Any]] = None) -> str:
         """Send message to local model"""
@@ -279,6 +281,24 @@ class AgentAssertion:
         """Assert that all given assertions pass"""
         from .assertions import AllOfAssertion
         return AllOfAssertion(assertions)
+    
+    @staticmethod
+    def any_of(assertions: List['BaseAssertion']):
+        """Assert that at least one of the given assertions passes"""
+        from .assertions import AnyOfAssertion
+        return AnyOfAssertion(assertions)
+    
+    @staticmethod
+    def min_length(min_chars: int):
+        """Assert minimum response length"""
+        from .assertions import MinLengthAssertion
+        return MinLengthAssertion(min_chars)
+    
+    @staticmethod
+    def regex(pattern: str):
+        """Assert response matches regex pattern"""
+        from .assertions import RegexAssertion
+        return RegexAssertion(pattern)
 
 
 def load_test_file(file_path: str) -> Dict[str, Any]:

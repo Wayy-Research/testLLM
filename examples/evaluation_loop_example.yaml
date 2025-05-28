@@ -1,0 +1,58 @@
+test_id: "greeting_with_evaluation_loop"
+description: "Test agent greeting using multi-LLM evaluation loop"
+
+# Evaluation loop configuration
+evaluation_loop:
+  iterations: 2                    # Run each test 2 times
+  evaluator_models:               # Multiple LLMs evaluate responses
+    - "gpt-4o-mini"               # Fast, cheap OpenAI model
+    - "claude-3-haiku"            # Fast Anthropic model
+    - "local-llama-3.1-8b"        # Local model via Ollama
+  consensus_threshold: 0.67       # 67% agreement required to pass
+  parallel_execution: true        # Run evaluators in parallel
+  timeout: 30                     # 30 second timeout per evaluation
+
+conversations:
+  - name: "basic_greeting"
+    turns:
+      - role: "user"
+        content: "Hello there!"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Responds with a friendly greeting"
+            weight: 1.0
+            description: "Agent should acknowledge the greeting in a warm, welcoming manner"
+          - criterion: "Tone is professional and helpful"
+            weight: 0.8
+            description: "Response should be professional while remaining approachable"
+          - criterion: "Response length is appropriate"
+            weight: 0.5
+            description: "Not too verbose, not too brief - just right for a greeting"
+
+  - name: "casual_greeting"
+    turns:
+      - role: "user"
+        content: "Hey!"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Acknowledges the casual greeting appropriately"
+            weight: 1.0
+          - criterion: "Matches the casual tone without being unprofessional"
+            weight: 0.9
+
+  - name: "multiple_turn_greeting"
+    turns:
+      - role: "user"
+        content: "Hi there!"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Provides friendly initial greeting"
+            weight: 1.0
+      - role: "user"
+        content: "How are you today?"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Responds appropriately to follow-up question"
+            weight: 1.0
+          - criterion: "Maintains conversational flow"
+            weight: 0.8

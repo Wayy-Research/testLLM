@@ -1,0 +1,62 @@
+test_id: "weather_query_evaluation"
+description: "Test weather query handling with semantic evaluation"
+
+evaluation_loop:
+  iterations: 1
+  evaluator_models:
+    - "gpt-4o-mini"
+    - "claude-3-haiku"
+  consensus_threshold: 0.75
+  parallel_execution: true
+
+conversations:
+  - name: "specific_city_weather"
+    turns:
+      - role: "user"
+        content: "What's the weather like in New York?"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Provides weather information for New York"
+            weight: 1.0
+            description: "Response should include weather details specific to New York City"
+          - criterion: "Information appears realistic and specific"
+            weight: 0.8
+            description: "Weather data should seem plausible, not generic"
+          - criterion: "Response is helpful and complete"
+            weight: 0.7
+            description: "User should have actionable weather information"
+
+  - name: "no_location_specified"
+    turns:
+      - role: "user"
+        content: "What's the weather like?"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Asks for location clarification"
+            weight: 1.0
+            description: "Agent should recognize missing location and ask user to specify"
+          - criterion: "Response is polite and helpful"
+            weight: 0.8
+            description: "Clarification request should be courteous"
+          - criterion: "Explains why location is needed"
+            weight: 0.6
+            description: "Agent should briefly explain why location info is necessary"
+
+  - name: "weather_follow_up"
+    turns:
+      - role: "user"
+        content: "Will it rain today in Seattle?"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Addresses rain probability for Seattle"
+            weight: 1.0
+      - role: "user"
+        content: "Should I bring an umbrella?"
+      - role: "agent"
+        semantic_criteria:
+          - criterion: "Provides practical advice based on weather"
+            weight: 1.0
+            description: "Agent should give actionable advice about umbrella based on rain forecast"
+          - criterion: "References earlier weather information"
+            weight: 0.7
+            description: "Should connect to previously mentioned Seattle weather"
