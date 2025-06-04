@@ -81,12 +81,19 @@ def agent(mock_agent):
     return mock_agent
 
 
-# Test using YAML definition - simplified approach
-def test_basic_greeting_yaml(mock_agent):
-    """Test basic greeting using YAML test definition"""
-    from testllm import load_test_file, run_test_from_yaml
-    test_def = load_test_file("examples/basic_greeting.yaml")
-    result = run_test_from_yaml(test_def, mock_agent)
+# Test using inline definition instead of YAML
+def test_basic_greeting_inline(mock_agent):
+    """Test basic greeting using inline test definition"""
+    test = ConversationTest("basic_greeting", "Agent should respond to greeting appropriately")
+    
+    test.add_turn(
+        "Hello there",
+        AgentAssertion.contains("hello"),
+        AgentAssertion.sentiment("positive"),
+        AgentAssertion.max_length(150)
+    )
+    
+    result = test.execute(mock_agent)
     assert result.passed, f"Test failed: {result.errors}"
 
 
@@ -204,13 +211,13 @@ def test_composite_assertions(mock_agent):
     test = ConversationTest("composite", "Test composite assertions")
     
     test.add_turn(
-        UserTurn("Hello, can you help me?"),
-        AgentAssertion.all_of([
+        "Hello, can you help me?",
+        AgentAssertion.all_of(
             AgentAssertion.contains("hello"),
             AgentAssertion.contains("help"),
             AgentAssertion.sentiment("positive"),
             AgentAssertion.max_length(300)
-        ])
+        )
     )
     
     result = test.execute(mock_agent)
@@ -222,13 +229,13 @@ def test_any_of_assertion(mock_agent):
     test = ConversationTest("any_of", "Test any_of assertion")
     
     test.add_turn(
-        UserTurn("What's the weather?"),  # No location specified
-        AgentAssertion.any_of([
+        "What's the weather?",  # No location specified
+        AgentAssertion.any_of(
             AgentAssertion.contains("location"),
             AgentAssertion.contains("where"),
             AgentAssertion.contains("city"),
             AgentAssertion.contains("specify")
-        ])
+        )
     )
     
     result = test.execute(mock_agent)

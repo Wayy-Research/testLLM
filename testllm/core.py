@@ -241,16 +241,16 @@ class AgentAssertion:
     """Factory class for creating agent assertions"""
     
     @staticmethod
-    def contains(pattern: str):
+    def contains(pattern: str, case_sensitive: bool = False):
         """Assert that response contains a pattern"""
         from .assertions import ContainsAssertion
-        return ContainsAssertion(pattern)
+        return ContainsAssertion(pattern, case_sensitive)
     
     @staticmethod
-    def excludes(pattern: str):
+    def excludes(pattern: str, case_sensitive: bool = False):
         """Assert that response excludes a pattern"""
         from .assertions import ExcludesAssertion
-        return ExcludesAssertion(pattern)
+        return ExcludesAssertion(pattern, case_sensitive)
     
     @staticmethod
     def max_length(max_chars: int):
@@ -259,8 +259,14 @@ class AgentAssertion:
         return MaxLengthAssertion(max_chars)
     
     @staticmethod
+    def min_length(min_chars: int):
+        """Assert minimum response length"""
+        from .assertions import MinLengthAssertion
+        return MinLengthAssertion(min_chars)
+    
+    @staticmethod
     def sentiment(expected: str):
-        """Assert response sentiment"""
+        """Assert response sentiment (positive, negative, or neutral)"""
         from .assertions import SentimentAssertion
         return SentimentAssertion(expected)
     
@@ -271,38 +277,45 @@ class AgentAssertion:
         return JsonValidAssertion()
     
     @staticmethod
+    def matches_json_schema(schema: Dict[str, Any]):
+        """Assert response matches JSON schema"""
+        from .assertions import JsonSchemaAssertion
+        return JsonSchemaAssertion(schema)
+    
+    @staticmethod
     def used_tool(tool_name: str):
         """Assert that agent used a specific tool"""
         from .assertions import ToolUsageAssertion
         return ToolUsageAssertion(tool_name)
     
     @staticmethod
-    def all_of(assertions: List['BaseAssertion']):
+    def all_of(*assertions):
         """Assert that all given assertions pass"""
         from .assertions import AllOfAssertion
-        return AllOfAssertion(assertions)
+        return AllOfAssertion(list(assertions))
     
     @staticmethod
-    def any_of(assertions: List['BaseAssertion']):
+    def any_of(*assertions):
         """Assert that at least one of the given assertions passes"""
         from .assertions import AnyOfAssertion
-        return AnyOfAssertion(assertions)
+        return AnyOfAssertion(list(assertions))
     
     @staticmethod
-    def min_length(min_chars: int):
-        """Assert minimum response length"""
-        from .assertions import MinLengthAssertion
-        return MinLengthAssertion(min_chars)
-    
-    @staticmethod
-    def regex(pattern: str):
+    def regex(pattern: str, flags: int = 0):
         """Assert response matches regex pattern"""
         from .assertions import RegexAssertion
-        return RegexAssertion(pattern)
+        return RegexAssertion(pattern, flags)
+    
+    @staticmethod
+    def token_count_under(max_tokens: int):
+        """Assert response has fewer than max_tokens (rough estimate)"""
+        from .assertions import TokenCountAssertion
+        return TokenCountAssertion(max_tokens)
 
 
+# Legacy YAML support functions - kept for backwards compatibility
 def load_test_file(file_path: str) -> Dict[str, Any]:
-    """Load test definitions from a YAML file"""
+    """Load test definitions from a YAML file (legacy)"""
     try:
         with open(file_path, 'r') as f:
             return yaml.safe_load(f)
@@ -313,7 +326,7 @@ def load_test_file(file_path: str) -> Dict[str, Any]:
 
 
 def run_test_from_yaml(test_def: Dict[str, Any], agent: AgentUnderTest) -> TestResult:
-    """Run a test based on YAML definition"""
+    """Run a test based on YAML definition (legacy)"""
     start_time = time.time()
     agent.reset_conversation()
     
@@ -383,7 +396,7 @@ def run_test_from_yaml(test_def: Dict[str, Any], agent: AgentUnderTest) -> TestR
 
 
 def agent_test(yaml_file: str):
-    """Decorator to create a pytest test from a YAML definition"""
+    """Decorator to create a pytest test from a YAML definition (legacy)"""
     def decorator(test_function):
         def wrapper(*args, **kwargs):
             # Extract agent from fixture

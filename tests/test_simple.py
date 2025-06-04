@@ -40,26 +40,31 @@ def test_basic_conversation(agent):
     assert result.passed, f"Test failed: {result.errors}"
 
 
-def test_yaml_greeting(agent):
-    """Test using YAML definition"""
-    test_def = load_test_file("test_yaml/test_greeting_yaml.yaml")
-    result = run_test_from_yaml(test_def, agent)
-    # Don't assert passed for now - just make sure it runs
-    print(f"Test result: {result.passed}")
-    print(f"Errors: {result.errors}")
+def test_greeting_inline(agent):
+    """Test greeting using inline definition"""
+    test = ConversationTest("inline_greeting", "Test inline greeting")
     
-    # Print detailed assertion results
-    for convo in result.conversations:
-        for turn in convo.get('turns', []):
-            if 'assertions' in turn:
-                for assertion in turn['assertions']:
-                    if not assertion.get('passed', True):
-                        print(f"Failed assertion: {assertion}")
+    test.add_turn(
+        "Hello there",
+        AgentAssertion.contains("hello"),
+        AgentAssertion.sentiment("positive"),
+        AgentAssertion.max_length(150)
+    )
+    
+    result = test.execute(agent)
+    assert result.passed, f"Test failed: {result.errors}"
 
 
-def test_basic_greeting_example(agent):
-    """Test the basic greeting example"""
-    test_def = load_test_file("examples/basic_greeting.yaml")
-    result = run_test_from_yaml(test_def, agent)
-    print(f"Test result: {result.passed}")
-    print(f"Errors: {result.errors}")
+def test_weather_inline(agent):
+    """Test weather query using inline definition"""
+    test = ConversationTest("inline_weather", "Test inline weather query")
+    
+    test.add_turn(
+        "What's the weather like?",
+        AgentAssertion.contains("weather"),
+        AgentAssertion.sentiment("positive"),
+        AgentAssertion.max_length(200)
+    )
+    
+    result = test.execute(agent)
+    assert result.passed, f"Test failed: {result.errors}"

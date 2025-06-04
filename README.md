@@ -27,43 +27,38 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ### 30-Second Example
 
-1. **Create a test** (`test_greeting.yaml`):
-```yaml
-test_id: "basic_greeting"
-description: "Agent should respond to greetings appropriately"
-conversations:
-  - name: "simple_hello"
-    turns:
-      - role: "user"
-        content: "Hello there!"
-      - role: "agent"
-        assertions:
-          - type: "contains"
-            value: "hello"
-          - type: "sentiment"
-            value: "positive"
-          - type: "max_length"
-            value: 150
-```
-
-2. **Write a pytest test** (`test_my_agent.py`):
+**Write a pytest test** (`test_my_agent.py`):
 ```python
 import pytest
-from testllm import agent_test, LocalAgent
+from testllm import LocalAgent, ConversationTest, AgentAssertion
 
 @pytest.fixture
 def my_agent():
     # Your agent implementation here
-    return LocalAgent(model=your_model)
+    class SimpleAgent:
+        def __call__(self, prompt):
+            return "Hello! How can I help you today?"
+    
+    return LocalAgent(model=SimpleAgent())
 
-@agent_test("test_greeting.yaml")
 def test_greeting(my_agent):
-    pass  # testLLM handles everything!
+    """Test basic greeting functionality"""
+    test = ConversationTest("greeting_test", "Agent should greet users appropriately")
+    
+    test.add_turn(
+        "Hello there!",
+        AgentAssertion.contains("hello"),
+        AgentAssertion.sentiment("positive"),
+        AgentAssertion.max_length(150)
+    )
+    
+    result = test.execute(my_agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
-3. **Run it**:
+**Run it**:
 ```bash
-pytest --testllm test_my_agent.py -v
+pytest test_my_agent.py -v
 ```
 
 That's it! 🎉
@@ -130,30 +125,39 @@ AgentAssertion.contains("hello")           # Flexible text matching
 AgentAssertion.sentiment("positive")       # Emotional tone
 AgentAssertion.max_length(100)            # Response constraints
 AgentAssertion.is_valid_json()            # Format validation
+AgentAssertion.any_of(                     # Multiple acceptable responses
+    AgentAssertion.contains("hello"),
+    AgentAssertion.contains("hi"),
+    AgentAssertion.contains("greetings")
+)
 ```
 
 ### 3. Conversation Testing
 
 Test realistic multi-turn interactions:
 
-```yaml
-conversations:
-  - name: "booking_flow"
-    turns:
-      - role: "user"
-        content: "I want to book a hotel"
-      - role: "agent"
-        assertions:
-          - type: "contains"
-            value: "hotel"
-      - role: "user" 
-        content: "In New York for 2 nights"
-      - role: "agent"
-        assertions:
-          - type: "contains"
-            value: "New York"
-          - type: "contains"
-            value: "2"
+```python
+def test_booking_conversation(agent):
+    """Test a hotel booking conversation flow"""
+    test = ConversationTest("booking_flow", "Test hotel booking conversation")
+    
+    # Turn 1: Initial request
+    test.add_turn(
+        "I want to book a hotel",
+        AgentAssertion.contains("hotel"),
+        AgentAssertion.sentiment("positive")
+    )
+    
+    # Turn 2: Provide details
+    test.add_turn(
+        "In New York for 2 nights", 
+        AgentAssertion.contains("New York"),
+        AgentAssertion.contains("2"),
+        AgentAssertion.max_length(200)
+    )
+    
+    result = test.execute(agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
 ## 📚 Complete Documentation
@@ -204,105 +208,120 @@ class MyAgent(AgentUnderTest):
         pass
 ```
 
-### Test Definition Formats
+### Writing Tests
 
-#### YAML Format (Recommended)
-```yaml
-test_id: "weather_query"
-description: "Handle weather requests appropriately"
-conversations:
-  - name: "specific_city"
-    turns:
-      - role: "user"
-        content: "What's the weather in Seattle?"
-      - role: "agent" 
-        assertions:
-          - type: "contains"
-            value: "weather"
-          - type: "excludes"
-            value: "I don't know"
-          - type: "max_length"
-            value: 300
+#### Basic Test Structure
+```python
+from testllm import ConversationTest, AgentAssertion
+
+def test_weather_query(agent):
+    """Test weather query handling"""
+    test = ConversationTest("weather_query", "Handle weather requests appropriately")
+    
+    test.add_turn(
+        "What's the weather in Seattle?",
+        AgentAssertion.contains("weather"),
+        AgentAssertion.excludes("I don't know"),
+        AgentAssertion.max_length(300)
+    )
+    
+    result = test.execute(agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
-#### Programmatic Format
+#### Multi-Turn Conversations
 ```python
-from testllm import ConversationTest, UserTurn, AgentAssertion
-
-test = ConversationTest("weather_query")
-test.add_turn(
-    UserTurn("What's the weather in Seattle?"),
-    AgentAssertion.contains("weather"),
-    AgentAssertion.excludes("I don't know"),
-    AgentAssertion.max_length(300)
-)
-
-result = test.execute(agent)
-assert result.passed
+def test_conversation_flow(agent):
+    """Test a complete conversation"""
+    test = ConversationTest("conversation_flow", "Test conversation flow")
+    
+    # Turn 1: Greeting
+    test.add_turn(
+        "Hi there!",
+        AgentAssertion.contains("hello"),
+        AgentAssertion.sentiment("positive")
+    )
+    
+    # Turn 2: Follow-up
+    test.add_turn(
+        "Can you help me?",
+        AgentAssertion.contains("help"),
+        AgentAssertion.max_length(200)
+    )
+    
+    result = test.execute(agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
 ### Advanced Features
 
 #### Composite Assertions
-```yaml
-assertions:
-  - type: "all_of"
-    value:
-      - type: "contains"
-        value: "temperature"
-      - type: "sentiment" 
-        value: "positive"
-      - type: "max_length"
-        value: 200
-```
+```python
+# Test that ALL assertions must pass
+test.add_turn(
+    "What's the temperature?",
+    AgentAssertion.all_of(
+        AgentAssertion.contains("temperature"),
+        AgentAssertion.sentiment("positive"),
+        AgentAssertion.max_length(200)
+    )
+)
 
-#### Multi-Conversation Tests
-```yaml
-conversations:
-  - name: "happy_path"
-    turns: [...]
-  - name: "error_handling"
-    turns: [...]
-  - name: "edge_cases"
-    turns: [...]
+# Test that ANY assertion can pass
+test.add_turn(
+    "Hello",
+    AgentAssertion.any_of(
+        AgentAssertion.contains("hello"),
+        AgentAssertion.contains("hi"),
+        AgentAssertion.contains("greetings")
+    )
+)
 ```
 
 #### JSON Response Testing
-```yaml
-assertions:
-  - type: "json_valid"
-  - type: "json_schema"
-    value:
-      type: "object"
-      properties:
-        temperature:
-          type: "number"
-        conditions:
-          type: "string"
-      required: ["temperature"]
+```python
+def test_json_response(agent):
+    """Test JSON response format"""
+    test = ConversationTest("json_test", "Test JSON output")
+    
+    test.add_turn(
+        "Return weather data as JSON",
+        AgentAssertion.is_valid_json(),
+        AgentAssertion.matches_json_schema({
+            "type": "object",
+            "properties": {
+                "temperature": {"type": "number"},
+                "conditions": {"type": "string"}
+            },
+            "required": ["temperature"]
+        })
+    )
+    
+    result = test.execute(agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
 ## 🔄 pytest Integration
 
 ### Run Specific Tests
 ```bash
-# Run all testLLM tests
-pytest --testllm
+# Run all tests
+pytest
 
 # Run specific test file  
-pytest --testllm test_weather.py
+pytest test_weather.py
 
 # Verbose output with details
-pytest --testllm test_weather.py -v
+pytest test_weather.py -v
 
-# Generate HTML report
-pytest --testllm --testllm-report=report.html
+# Run tests matching a pattern
+pytest -k "test_greeting"
 ```
 
 ### Test Discovery
-testLLM automatically discovers:
-- `test_*.yaml` files for YAML tests
-- Functions decorated with `@agent_test()`
+testLLM works with standard pytest discovery:
+- Test functions starting with `test_`
+- Test files starting with `test_` or ending with `_test.py`
 - Standard pytest test functions using testLLM assertions
 
 ### Fixtures and Setup
@@ -320,9 +339,16 @@ def reset_agent_state(shared_agent):
     """Reset agent before each test"""
     shared_agent.reset_conversation()
 
-@agent_test("test_suite.yaml")
 def test_agent_behavior(shared_agent):
-    pass
+    """Test agent behavior using shared fixture"""
+    test = ConversationTest("behavior_test", "Test agent behavior")
+    test.add_turn(
+        "Hello!",
+        AgentAssertion.contains("hello"),
+        AgentAssertion.sentiment("positive")
+    )
+    result = test.execute(shared_agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
 ## 📊 Reporting
@@ -351,7 +377,7 @@ export_report(results, "results.json", format="json")
 # GitHub Actions example
 - name: Run testLLM Tests
   run: |
-    pytest --testllm tests/ --testllm-report=report.html
+    pytest tests/ --html=report.html --self-contained-html
     
 - name: Upload Test Report
   uses: actions/upload-artifact@v3
@@ -363,71 +389,69 @@ export_report(results, "results.json", format="json")
 ## 🏆 Real-World Examples
 
 ### Testing a Customer Service Bot
-```yaml
-test_id: "customer_service"
-description: "Customer service bot handles inquiries professionally"
-conversations:
-  - name: "greeting_and_help"
-    turns:
-      - role: "user"
-        content: "Hi, I need help with my order"
-      - role: "agent"
-        assertions:
-          - type: "sentiment"
-            value: "positive"
-          - type: "contains"
-            value: "help"
-          - type: "excludes"
-            value: "sorry"
-      - role: "user"
-        content: "My order number is 12345"
-      - role: "agent"
-        assertions:
-          - type: "contains"
-            value: "12345"
-          - type: "max_length"
-            value: 500
+```python
+def test_customer_service_flow(customer_service_agent):
+    """Test customer service conversation flow"""
+    test = ConversationTest("customer_service", "Customer service bot handles inquiries professionally")
+    
+    # Turn 1: Initial help request
+    test.add_turn(
+        "Hi, I need help with my order",
+        AgentAssertion.sentiment("positive"),
+        AgentAssertion.contains("help"),
+        AgentAssertion.excludes("sorry")
+    )
+    
+    # Turn 2: Provide order number
+    test.add_turn(
+        "My order number is 12345",
+        AgentAssertion.contains("12345"),
+        AgentAssertion.max_length(500),
+        AgentAssertion.sentiment("positive")
+    )
+    
+    result = test.execute(customer_service_agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
 ### Testing a Code Assistant
-```yaml
-test_id: "code_generation"
-description: "Code assistant generates valid Python"
-conversations:
-  - name: "function_request"
-    turns:
-      - role: "user"
-        content: "Write a function to calculate fibonacci numbers"
-      - role: "agent"
-        assertions:
-          - type: "contains"
-            value: "def"
-          - type: "contains"
-            value: "fibonacci"
-          - type: "regex"
-            value: "def\\s+\\w+\\s*\\("
+```python
+def test_code_generation(code_assistant_agent):
+    """Test code generation capabilities"""
+    test = ConversationTest("code_generation", "Code assistant generates valid Python")
+    
+    test.add_turn(
+        "Write a function to calculate fibonacci numbers",
+        AgentAssertion.contains("def"),
+        AgentAssertion.contains("fibonacci"),
+        AgentAssertion.regex(r"def\s+\w+\s*\("),
+        AgentAssertion.excludes("error")
+    )
+    
+    result = test.execute(code_assistant_agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
 ### Testing a Data Analysis Agent
-```yaml
-test_id: "data_analysis" 
-description: "Agent provides structured data insights"
-conversations:
-  - name: "json_analysis"
-    turns:
-      - role: "user"
-        content: "Analyze this data and return JSON: [1,2,3,4,5]"
-      - role: "agent"
-        assertions:
-          - type: "json_valid"
-          - type: "json_schema"
-            value:
-              type: "object"
-              properties:
-                mean:
-                  type: "number"
-                median:
-                  type: "number"
+```python
+def test_data_analysis(data_agent):
+    """Test data analysis with JSON output"""
+    test = ConversationTest("data_analysis", "Agent provides structured data insights")
+    
+    test.add_turn(
+        "Analyze this data and return JSON: [1,2,3,4,5]",
+        AgentAssertion.is_valid_json(),
+        AgentAssertion.matches_json_schema({
+            "type": "object",
+            "properties": {
+                "mean": {"type": "number"},
+                "median": {"type": "number"}
+            }
+        })
+    )
+    
+    result = test.execute(data_agent)
+    assert result.passed, f"Test failed: {result.errors}"
 ```
 
 ## 🔧 Configuration
