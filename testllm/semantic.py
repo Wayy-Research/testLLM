@@ -72,8 +72,39 @@ class SemanticTest:
             iterations=3
         )
     
+    def add_scenario(self, user_input: str, criteria: List[str], **metadata) -> 'SemanticTest':
+        """
+        Add a test scenario with semantic evaluation criteria.
+        
+        Args:
+            user_input: The message to send to the agent
+            criteria: List of natural language criteria for evaluation
+            **metadata: Additional metadata for the test scenario
+            
+        Returns:
+            Self for method chaining
+            
+        Example:
+            test.add_scenario(
+                user_input="What's the weather like?",
+                criteria=[
+                    "Response should acknowledge the weather question",
+                    "Response should ask for location or provide helpful guidance",
+                    "Response should be polite and helpful"
+                ]
+            )
+        """
+        test_case = SemanticTestCase(
+            user_input=user_input,
+            criteria=criteria,
+            metadata=metadata
+        )
+        self.test_cases.append(test_case)
+        return self
+    
     def add_case(self, user_input: str, *criteria: str, **metadata) -> 'SemanticTest':
         """
+        DEPRECATED: Use add_scenario() instead for clearer API.
         Add a test case with semantic evaluation criteria.
         
         Args:
@@ -83,22 +114,8 @@ class SemanticTest:
             
         Returns:
             Self for method chaining
-            
-        Example:
-            test.add_case(
-                "What's the weather like?",
-                "Response should acknowledge the weather question",
-                "Response should ask for location or provide helpful guidance",
-                "Response should be polite and helpful"
-            )
         """
-        test_case = SemanticTestCase(
-            user_input=user_input,
-            criteria=list(criteria),
-            metadata=metadata
-        )
-        self.test_cases.append(test_case)
-        return self
+        return self.add_scenario(user_input, list(criteria), **metadata)
     
     async def execute(self, agent: AgentUnderTest) -> List[SemanticTestResult]:
         """

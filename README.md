@@ -27,33 +27,60 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ### 30-Second Example
 
-**Write a semantic test** (`test_my_agent.py`):
+**Write a production flow test** (`test_my_agent.py`):
 ```python
 import pytest
-from testllm import LocalAgent, semantic_test
+from testllm import LocalAgent, conversation_flow
 
 @pytest.fixture
 def my_agent():
     # Your agent implementation here
-    class SimpleAgent:
+    class CustomerServiceAgent:
         def __call__(self, prompt):
-            return "Hello! How can I help you today?"
+            if "new customer" in prompt.lower():
+                return "Welcome! I'll help you get started with our onboarding process."
+            elif "name is" in prompt.lower():
+                return "Nice to meet you! I've noted your information."
+            return "I understand your request. How can I help you further?"
     
-    return LocalAgent(model=SimpleAgent())
+    return LocalAgent(model=CustomerServiceAgent())
 
-def test_greeting_behavior(my_agent):
-    """Test that agent greets users appropriately"""
-    test = semantic_test("greeting_test", "Agent should greet users appropriately")
+def test_customer_onboarding_flow(my_agent):
+    """Test complete customer onboarding workflow"""
+    flow = conversation_flow("onboarding", "Customer onboarding process")
     
-    test.add_case(
-        "Hello there!",
-        "Response should be a friendly greeting",
-        "Response should offer to help the user",
-        "Response should be polite and professional"
+    # Step 1: Initial contact
+    flow.step(
+        "Hello, I'm a new customer interested in your services",
+        criteria=[
+            "Response should acknowledge new customer status",
+            "Response should begin onboarding process",
+            "Response should be professional and welcoming"
+        ]
     )
     
-    results = test.execute_sync(my_agent)
-    assert all(r.passed for r in results), f"Test failed: {[r.errors for r in results if not r.passed]}"
+    # Step 2: Information gathering with context retention
+    flow.step(
+        "My name is Sarah and I need a business account",
+        criteria=[
+            "Response should acknowledge the name Sarah",
+            "Response should understand business account requirement"
+        ],
+        expect_context_retention=True
+    )
+    
+    # Step 3: Memory validation
+    flow.context_check(
+        "What type of account was I requesting?",
+        context_criteria=[
+            "Response should remember business account request",
+            "Response should demonstrate conversation awareness"
+        ]
+    )
+    
+    result = flow.execute_sync(my_agent)
+    assert result.passed, f"Flow failed: {result.flow_errors}"
+    assert result.context_retention_score >= 0.7, "Poor context retention"
 ```
 
 **Run it**:
@@ -61,7 +88,7 @@ def test_greeting_behavior(my_agent):
 pytest test_my_agent.py -v
 ```
 
-That's it! Claude Sonnet 4 evaluates your agent's responses against natural language criteria. 🎉
+That's it! Claude Sonnet 4 evaluates your agent's behavior across multi-step conversations, testing context retention, tool usage patterns, and business logic compliance. 🎉
 
 ## 🎯 Why testLLM?
 
@@ -84,31 +111,87 @@ Traditional testing breaks down with LLM agents because:
 
 ## 🏗️ Core Concepts
 
-### 1. Semantic Testing with Claude Sonnet 4
+### 1. Production Flow Testing
 
-testLLM uses Claude Sonnet 4 as an intelligent evaluator. Write natural language criteria:
+testLLM's primary focus is testing **production agentic systems** through multi-step conversation flows:
 
 ```python
-from testllm import semantic_test
+from testllm import conversation_flow, BusinessLogicPatterns
 
-def test_customer_support(agent):
-    """Test customer support responses"""
-    test = semantic_test("support_test", "Customer support behavior")
+def test_e_commerce_workflow(agent):
+    """Test complete e-commerce purchase flow"""
+    flow = conversation_flow("purchase", "E-commerce purchase workflow")
     
-    test.add_case(
-        "I need help with my account",
-        "Response should acknowledge the help request",
-        "Response should be professional and helpful",
-        "Response should ask for more details or offer specific assistance"
+    # Product discovery with tool usage
+    flow.tool_usage_check(
+        "I'm looking for a laptop for machine learning",
+        expected_tools=["product_search", "ml_filter"],
+        criteria=[
+            "Response should search product catalog",
+            "Response should understand ML requirements"
+        ]
     )
     
-    results = test.execute_sync(agent)
+    # Business logic validation
+    flow.business_logic_check(
+        "I want the Dell XPS, what's the price?",
+        business_rules=["inventory_check", "pricing"],
+        criteria=[
+            "Response should check availability",
+            "Response should provide current pricing"
+        ]
+    )
+    
+    # Context retention across steps
+    flow.context_check(
+        "Can I get expedited shipping for that laptop?",
+        context_criteria=[
+            "Response should reference the Dell XPS from previous step",
+            "Response should offer shipping options"
+        ]
+    )
+    
+    result = flow.execute_sync(agent)
+    assert result.passed
+    assert result.business_logic_score >= 0.8
+    assert result.context_retention_score >= 0.7
+```
+
+### 2. Behavioral Pattern Testing
+
+Pre-built patterns for common agentic behaviors:
+
+```python
+from testllm import ToolUsagePatterns, BusinessLogicPatterns, ContextPatterns
+
+def test_agent_patterns(agent):
+    """Test using pre-built behavioral patterns"""
+    
+    # Test API integration behavior
+    api_flow = ToolUsagePatterns.api_integration_pattern(
+        "Get current stock price of AAPL", 
+        "financial"
+    )
+    
+    # Test business workflow
+    auth_flow = BusinessLogicPatterns.user_authentication_flow("premium")
+    
+    # Test memory and context
+    memory_flow = ContextPatterns.multi_turn_memory()
+    
+    # Execute all patterns
+    results = [
+        api_flow.execute_sync(agent),
+        auth_flow.execute_sync(agent), 
+        memory_flow.execute_sync(agent)
+    ]
+    
     assert all(r.passed for r in results)
 ```
 
-### 2. Universal Agent Support
+### 3. Universal Agent Support
 
-testLLM works with **any** agent by focusing on input/output testing:
+testLLM works with **any** agent through black-box testing:
 
 ```python
 # Local model
@@ -125,50 +208,37 @@ class MyAgent(AgentUnderTest):
         return your_custom_logic(content)
 ```
 
-### 3. Stochastic Reliability
+### 4. Intelligent Evaluation with Claude Sonnet 4
 
-Since LLM outputs are non-deterministic, testLLM runs multiple evaluations:
+All testing uses Claude Sonnet 4 as an intelligent evaluator:
 
 ```python
-# Default: 3 iterations with 67% consensus threshold
-test = semantic_test("reliability_test")
+# Default: 3 iterations with 67% consensus threshold for reliability
+flow = conversation_flow("test_id")
 
-# Custom reliability settings
-test = semantic_test(
+# Custom evaluation settings
+flow = conversation_flow(
     "custom_test", 
     evaluator_models=["claude-sonnet-4"],  # Always Claude Sonnet 4
     consensus_threshold=0.8  # 80% consensus required
 )
 ```
 
-### 4. Multiple Test Cases
+### 5. Semantic Testing (Single Turn)
 
-Test different scenarios in a single test:
+For simpler scenarios, test individual responses:
 
 ```python
-def test_agent_versatility(agent):
-    """Test agent across different scenarios"""
-    test = semantic_test("versatility_test", "Agent handles various requests")
+def test_single_response(agent):
+    """Test individual agent responses"""
+    test = semantic_test("response_test", "Single response testing")
     
-    # Greeting scenario
-    test.add_case(
-        "Hello!",
-        "Response should be a friendly greeting",
-        "Response should offer assistance"
-    )
-    
-    # Information request
-    test.add_case(
-        "What's the weather in Seattle?",
-        "Response should acknowledge the weather question",
-        "Response should ask for clarification or provide helpful guidance"
-    )
-    
-    # Task request
-    test.add_case(
-        "Help me write an email",
-        "Response should offer to help with email writing",
-        "Response should ask for details about the email"
+    test.add_scenario(
+        user_input="What's the weather in Seattle?",
+        criteria=[
+            "Response should acknowledge the weather question",
+            "Response should ask for clarification or provide helpful guidance"
+        ]
     )
     
     results = test.execute_sync(agent)
@@ -407,61 +477,122 @@ export_report(results, "results.json", format="json")
 
 ### Testing a Customer Service Bot
 ```python
-def test_customer_service_flow(customer_service_agent):
-    """Test customer service using semantic evaluation"""
-    test = semantic_test("customer_service", "Customer service bot handles inquiries professionally")
+def test_customer_service_escalation_flow(customer_service_agent):
+    """Test complete customer service escalation workflow"""
+    flow = conversation_flow("customer_service", "Customer service escalation handling")
     
-    test.add_case(
-        "Hi, I need help with my order",
-        "Response should acknowledge the help request professionally",
-        "Response should ask for order details or account information",
-        "Response should be empathetic and helpful"
+    # Initial support request
+    flow.step(
+        "I've been having trouble with my account for three days",
+        criteria=[
+            "Response should acknowledge the frustration",
+            "Response should show empathy for the situation",
+            "Response should offer immediate assistance"
+        ]
     )
     
-    test.add_case(
-        "My order number is 12345 and it's late",
-        "Response should acknowledge the order number",
-        "Response should address the delivery concern",
-        "Response should offer solutions or next steps"
+    # Escalation trigger
+    flow.business_logic_check(
+        "This is the fourth time I'm contacting support about this",
+        business_rules=["escalation_trigger", "case_history_review"],
+        criteria=[
+            "Response should recognize escalation need",
+            "Response should reference case history",
+            "Response should offer higher-level support"
+        ]
     )
     
-    results = test.execute_sync(customer_service_agent)
-    assert all(r.passed for r in results)
+    # Resolution approach
+    flow.business_logic_check(
+        "I need this resolved today as it affects my business",
+        business_rules=["priority_handling", "business_impact"],
+        criteria=[
+            "Response should understand business impact",
+            "Response should commit to resolution timeline",
+            "Response should provide escalation path"
+        ]
+    )
+    
+    result = flow.execute_sync(customer_service_agent)
+    assert result.passed
+    assert result.business_logic_score >= 0.8
 ```
 
-### Testing a Code Assistant
+### Testing a Travel Booking Agent
 ```python
-def test_code_generation(code_assistant_agent):
-    """Test code generation capabilities"""
-    test = semantic_test("code_generation", "Code assistant generates valid Python")
+def test_multi_system_travel_booking(travel_agent):
+    """Test complex multi-system coordination"""
+    flow = conversation_flow("travel_booking", "Multi-system travel coordination")
     
-    test.add_case(
-        "Write a function to calculate fibonacci numbers",
-        "Response should contain a Python function definition",
-        "Response should implement fibonacci logic correctly",
-        "Response should include proper function syntax",
-        "Response should be well-formatted and readable"
+    # Initial travel request
+    flow.tool_usage_check(
+        "Book me a flight from Seattle to NYC and a hotel in Manhattan",
+        expected_tools=["flight_search", "hotel_search", "coordination"],
+        criteria=[
+            "Response should indicate searching both flights and hotels",
+            "Response should show understanding of coordination needs",
+            "Response should ask for travel dates and preferences"
+        ]
     )
     
-    results = test.execute_sync(code_assistant_agent)
-    assert all(r.passed for r in results)
+    # Complex coordination
+    flow.business_logic_check(
+        "Make sure the hotel checkout aligns with my return flight",
+        business_rules=["travel_coordination", "schedule_optimization"],
+        criteria=[
+            "Response should understand timing coordination",
+            "Response should reference both bookings",
+            "Response should demonstrate travel planning logic"
+        ]
+    )
+    
+    # Context validation
+    flow.context_check(
+        "What departure time did you find for my return flight?",
+        context_criteria=[
+            "Response should reference the return flight from booking context",
+            "Response should provide specific timing information"
+        ]
+    )
+    
+    result = flow.execute_sync(travel_agent)
+    assert result.passed
+    assert result.tool_usage_score >= 0.7
+    assert result.business_logic_score >= 0.7
+    assert result.context_retention_score >= 0.8
 ```
 
-### Testing a Data Analysis Agent
+### Testing a Financial Assistant
 ```python
-def test_data_analysis(data_agent):
-    """Test data analysis capabilities"""
-    test = semantic_test("data_analysis", "Agent provides structured data insights")
+def test_financial_analysis_workflow(financial_agent):
+    """Test financial data analysis and real-time integration"""
+    flow = IntegrationPatterns.real_time_data_pattern("financial")
     
-    test.add_case(
-        "Analyze this data and return JSON: [1,2,3,4,5]",
-        "Response should provide data analysis in JSON format",
-        "Response should include statistical measures like mean or sum",
-        "Response should be properly formatted as valid JSON"
+    # Add complex analysis request
+    flow.step(
+        "Analyze AAPL stock performance and compare to NASDAQ",
+        criteria=[
+            "Response should indicate accessing real-time financial data",
+            "Response should show understanding of comparative analysis",
+            "Response should mention data sources and timeframes"
+        ]
     )
     
-    results = test.execute_sync(data_agent)
-    assert all(r.passed for r in results)
+    # Data reliability check
+    flow.business_logic_check(
+        "I need this for automated trading, so accuracy is critical",
+        business_rules=["data_quality", "trading_compliance"],
+        criteria=[
+            "Response should understand trading criticality",
+            "Response should address data accuracy and reliability",
+            "Response should mention compliance considerations"
+        ]
+    )
+    
+    result = flow.execute_sync(financial_agent)
+    assert result.passed
+    assert result.tool_usage_score >= 0.8
+    assert result.business_logic_score >= 0.9
 ```
 
 ## 🔧 Configuration

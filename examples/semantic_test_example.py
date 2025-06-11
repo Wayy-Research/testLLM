@@ -42,18 +42,22 @@ def test_greeting_behavior_semantic(my_agent):
         consensus_threshold=0.7
     )
     
-    # Add test cases with natural language criteria
-    test.add_case(
-        "Hello there!",
-        "Response should be a friendly greeting",
-        "Response should offer help or assistance",
-        "Response should be professional but warm"
+    # Add test scenarios with natural language criteria
+    test.add_scenario(
+        user_input="Hello there!",
+        criteria=[
+            "Response should be a friendly greeting",
+            "Response should offer help or assistance",
+            "Response should be professional but warm"
+        ]
     )
     
-    test.add_case(
-        "Hi!",
-        "Response should acknowledge the greeting",
-        "Response should invite further interaction"
+    test.add_scenario(
+        user_input="Hi!",
+        criteria=[
+            "Response should acknowledge the greeting",
+            "Response should invite further interaction"
+        ]
     )
     
     # Execute the test (async)
@@ -72,17 +76,21 @@ def test_weather_inquiry_semantic(my_agent):
         "Test agent's handling of weather questions"
     )
     
-    test.add_case(
-        "What's the weather like?",
-        "Response should acknowledge the weather inquiry",
-        "Response should ask for location information",
-        "Response should be helpful and informative"
+    test.add_scenario(
+        user_input="What's the weather like?",
+        criteria=[
+            "Response should acknowledge the weather inquiry",
+            "Response should ask for location information",
+            "Response should be helpful and informative"
+        ]
     )
     
-    test.add_case(
-        "Will it rain tomorrow?",
-        "Response should understand this is a weather prediction question",
-        "Response should indicate need for location or offer general guidance"
+    test.add_scenario(
+        user_input="Will it rain tomorrow?",
+        criteria=[
+            "Response should understand this is a weather prediction question",
+            "Response should indicate need for location or offer general guidance"
+        ]
     )
     
     results = test.execute_sync(my_agent)
@@ -116,26 +124,32 @@ def test_conversation_flow_semantic(my_agent):
     test = SemanticTest("conversation_flow", "Test multi-turn conversation")
     
     # First turn: Greeting
-    test.add_case(
-        "Hi there!",
-        "Response should be a warm greeting",
-        "Response should invite further interaction"
+    test.add_scenario(
+        user_input="Hi there!",
+        criteria=[
+            "Response should be a warm greeting",
+            "Response should invite further interaction"
+        ]
     )
     
     # Second turn: Request
-    test.add_case(
-        "Can you help me with weather information?",
-        "Response should acknowledge the weather request",
-        "Response should ask for specifics like location",
-        "Response should maintain helpful tone"
+    test.add_scenario(
+        user_input="Can you help me with weather information?",
+        criteria=[
+            "Response should acknowledge the weather request",
+            "Response should ask for specifics like location",
+            "Response should maintain helpful tone"
+        ]
     )
     
     # Third turn: Goodbye
-    test.add_case(
-        "Thanks, goodbye!",
-        "Response should acknowledge the thanks",
-        "Response should provide a polite farewell",
-        "Response should be positive and closing"
+    test.add_scenario(
+        user_input="Thanks, goodbye!",
+        criteria=[
+            "Response should acknowledge the thanks",
+            "Response should provide a polite farewell",
+            "Response should be positive and closing"
+        ]
     )
     
     results = test.execute_sync(my_agent)
@@ -156,11 +170,13 @@ def test_with_multiple_evaluators(my_agent):
         consensus_threshold=0.75
     )
     
-    test.add_case(
-        "Hello! How are you doing today?",
-        "Response should be friendly and engaging",
-        "Response should reciprocate the greeting appropriately",
-        "Response should maintain professional boundaries while being warm"
+    test.add_scenario(
+        user_input="Hello! How are you doing today?",
+        criteria=[
+            "Response should be friendly and engaging",
+            "Response should reciprocate the greeting appropriately",
+            "Response should maintain professional boundaries while being warm"
+        ]
     )
     
     results = test.execute_sync(my_agent)
@@ -179,13 +195,15 @@ def test_advanced_semantic_criteria(my_agent):
     """Test with more sophisticated semantic criteria"""
     test = semantic_test("advanced_criteria", "Test advanced semantic evaluation")
     
-    test.add_case(
-        "I'm feeling confused about something",
-        "Response should show empathy and understanding",
-        "Response should offer support without being presumptuous",
-        "Response should invite the user to share more details",
-        "Response should avoid giving premature advice",
-        "Tone should be supportive but not overly emotional"
+    test.add_scenario(
+        user_input="I'm feeling confused about something",
+        criteria=[
+            "Response should show empathy and understanding",
+            "Response should offer support without being presumptuous",
+            "Response should invite the user to share more details",
+            "Response should avoid giving premature advice",
+            "Tone should be supportive but not overly emotional"
+        ]
     )
     
     results = test.execute_sync(my_agent)
@@ -222,10 +240,12 @@ if __name__ == "__main__":
     
     # Create and run a semantic test
     test = semantic_test("demo", "Demo semantic test")
-    test.add_case(
-        "Hello!",
-        "Response should be a friendly greeting",
-        "Response should offer help"
+    test.add_scenario(
+        user_input="Hello!",
+        criteria=[
+            "Response should be a friendly greeting",
+            "Response should offer help"
+        ]
     )
     
     results = test.execute_sync(agent)

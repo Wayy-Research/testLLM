@@ -26,6 +26,23 @@ from .semantic import (
     pytest_semantic_test,
 )
 
+# Production flow testing
+from .flows import (
+    ConversationFlow,
+    FlowResult,
+    FlowStep,
+    conversation_flow,
+)
+
+# Behavioral pattern testing
+from .behavioral import (
+    ToolUsagePatterns,
+    BusinessLogicPatterns,
+    ContextPatterns,
+    IntegrationPatterns,
+    PerformancePatterns,
+)
+
 from .assertions import (
     AssertionResult,
     BaseAssertion,
@@ -60,6 +77,19 @@ __all__ = [
     "SemanticTestCase", 
     "semantic_test",
     "pytest_semantic_test",
+    
+    # Production flow testing
+    "ConversationFlow",
+    "FlowResult",
+    "FlowStep",
+    "conversation_flow",
+    
+    # Behavioral pattern testing
+    "ToolUsagePatterns",
+    "BusinessLogicPatterns",
+    "ContextPatterns",
+    "IntegrationPatterns",
+    "PerformancePatterns",
     
     # Legacy assertion-based testing
     "ConversationTest",
