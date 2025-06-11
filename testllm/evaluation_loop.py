@@ -61,8 +61,8 @@ class ConsensusResult:
 @dataclass
 class EvaluationLoopConfig:
     """Configuration for the evaluation loop"""
-    iterations: int = 1
-    evaluator_models: List[str] = field(default_factory=lambda: ["gpt-4o-mini"])
+    iterations: int = 3
+    evaluator_models: List[str] = field(default_factory=lambda: ["claude-sonnet-4"])
     consensus_threshold: float = 0.67
     timeout: int = 30
     parallel_execution: bool = True
@@ -132,17 +132,15 @@ Evaluate whether the agent response meets the criterion. Consider:
 
 Respond in this exact JSON format:
 {{
-    "decision": "YES|NO|MAYBE",
-    "confidence": 0.85,
+    "decision": "YES|NO",
     "reasoning": "Brief explanation of your evaluation"
 }}
 
 Decision guide:
-- YES: Clearly meets the criterion
-- NO: Clearly does not meet the criterion  
-- MAYBE: Partially meets or unclear
+- YES: The response meets the criterion
+- NO: The response does not meet the criterion
 
-Be precise and objective in your evaluation."""
+You must choose either YES or NO. Be precise and objective in your evaluation."""
     
     async def _call_model(self, prompt: str) -> str:
         """Call the evaluator model - to be implemented by subclasses"""
@@ -158,12 +156,11 @@ Be precise and objective in your evaluation."""
                 result = json.loads(json_match.group())
                 
                 # Validate required fields
-                decision = result.get("decision", "MAYBE").upper()
-                if decision not in ["YES", "NO", "MAYBE"]:
-                    decision = "MAYBE"
+                decision = result.get("decision", "NO").upper()
+                if decision not in ["YES", "NO"]:
+                    decision = "NO"
                 
-                confidence = float(result.get("confidence", 0.5))
-                confidence = max(0.0, min(1.0, confidence))  # Clamp to 0-1
+                confidence = 1.0  # No longer using confidence scoring
                 
                 reasoning = result.get("reasoning", "No reasoning provided")
                 
@@ -179,13 +176,10 @@ Be precise and objective in your evaluation."""
         response_upper = response.upper()
         if "YES" in response_upper:
             decision = "YES"
-            confidence = 0.8
-        elif "NO" in response_upper:
-            decision = "NO"
-            confidence = 0.8
         else:
-            decision = "MAYBE"
-            confidence = 0.5
+            decision = "NO"
+        
+        confidence = 1.0  # No longer using confidence scoring
         
         return {
             "decision": decision,
@@ -385,11 +379,9 @@ class EvaluationLoop:
         decision_scores = []
         for eval_result in evaluations:
             if eval_result.decision == "YES":
-                score = eval_result.confidence
-            elif eval_result.decision == "NO":
-                score = 1.0 - eval_result.confidence
-            else:  # MAYBE
-                score = 0.5
+                score = 1.0
+            else:  # NO
+                score = 0.0
             
             decision_scores.append(score)
         
@@ -415,7 +407,7 @@ def create_evaluation_loop(config_dict: Dict[str, Any]) -> EvaluationLoop:
     """Create evaluation loop from configuration dictionary"""
     config = EvaluationLoopConfig(
         iterations=config_dict.get("iterations", 1),
-        evaluator_models=config_dict.get("evaluator_models", ["gpt-4o-mini"]),
+        evaluator_models=config_dict.get("evaluator_models", ["claude-sonnet-4"]),
         consensus_threshold=config_dict.get("consensus_threshold", 0.67),
         timeout=config_dict.get("timeout", 30),
         parallel_execution=config_dict.get("parallel_execution", True),

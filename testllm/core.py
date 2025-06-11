@@ -13,8 +13,23 @@ import requests
 
 
 @dataclass
+class SemanticTestResult:
+    """Result of a semantic test evaluation"""
+    test_id: str
+    description: str
+    passed: bool
+    user_input: str
+    agent_response: str
+    test_criteria: List[str]
+    evaluation_results: List[Dict[str, Any]] = field(default_factory=list)
+    consensus_score: float = 0.0
+    errors: List[str] = field(default_factory=list)
+    execution_time: float = 0.0
+
+
+@dataclass
 class TestResult:
-    """Result of a test execution"""
+    """Legacy result of a test execution"""
     test_id: str
     description: str
     passed: bool
@@ -148,8 +163,107 @@ class LocalAgent(AgentUnderTest):
         return self._tool_calls.copy()
 
 
+class SemanticTest:
+    """Semantic test definition with LLM evaluation"""
+    
+    def __init__(self, test_id: str, description: str = "", evaluator_models: Optional[List[str]] = None):
+        self.test_id = test_id
+        self.description = description
+        self.evaluator_models = evaluator_models or ["gpt-4o-mini"]
+        self.test_cases: List[Dict[str, Any]] = []
+    
+    def add_test_case(self, user_input: str, *criteria: str) -> None:
+        """Add a test case with semantic evaluation criteria
+        
+        Args:
+            user_input: The input message to send to the agent
+            *criteria: Semantic criteria for evaluation (e.g., "Response should be helpful and accurate")
+        """
+        self.test_cases.append({
+            "user_input": user_input,
+            "criteria": list(criteria)
+        })
+    
+    async def execute(self, agent: AgentUnderTest) -> List[SemanticTestResult]:
+        """Execute semantic test against an agent using LLM evaluation"""
+        from .evaluation_loop import EvaluationLoop, EvaluationLoopConfig, SemanticCriterion
+        
+        config = EvaluationLoopConfig(
+            evaluator_models=self.evaluator_models,
+            consensus_threshold=0.67,
+            parallel_execution=True
+        )
+        evaluator = EvaluationLoop(config)
+        
+        results = []
+        agent.reset_conversation()
+        
+        for test_case in self.test_cases:
+            start_time = time.time()
+            
+            try:
+                # Get agent response
+                user_input = test_case["user_input"]
+                agent_response = agent.send_message(user_input)
+                
+                # Convert criteria to SemanticCriterion objects
+                semantic_criteria = [
+                    SemanticCriterion(criterion=criterion) 
+                    for criterion in test_case["criteria"]
+                ]
+                
+                # Evaluate with LLM
+                consensus_results = await evaluator.evaluate_response(
+                    user_input, agent_response, semantic_criteria
+                )
+                
+                # Calculate overall pass/fail
+                passed = all(result.passed for result in consensus_results)
+                overall_score = sum(result.consensus_score for result in consensus_results) / len(consensus_results)
+                
+                # Create result
+                result = SemanticTestResult(
+                    test_id=f"{self.test_id}_{len(results)}",
+                    description=self.description,
+                    passed=passed,
+                    user_input=user_input,
+                    agent_response=agent_response,
+                    test_criteria=test_case["criteria"],
+                    evaluation_results=[{
+                        "criterion": r.criterion,
+                        "consensus_score": r.consensus_score,
+                        "passed": r.passed,
+                        "individual_results": [{
+                            "evaluator": eval_result.evaluator_model,
+                            "decision": eval_result.decision,
+                            "confidence": eval_result.confidence,
+                            "reasoning": eval_result.reasoning
+                        } for eval_result in r.individual_results]
+                    } for r in consensus_results],
+                    consensus_score=overall_score,
+                    execution_time=time.time() - start_time
+                )
+                
+                results.append(result)
+                
+            except Exception as e:
+                error_result = SemanticTestResult(
+                    test_id=f"{self.test_id}_{len(results)}",
+                    description=self.description,
+                    passed=False,
+                    user_input=test_case.get("user_input", ""),
+                    agent_response="",
+                    test_criteria=test_case.get("criteria", []),
+                    errors=[f"Execution error: {e}"],
+                    execution_time=time.time() - start_time
+                )
+                results.append(error_result)
+        
+        return results
+
+
 class ConversationTest:
-    """Programmatic test definition and execution"""
+    """Legacy programmatic test definition and execution"""
     
     def __init__(self, test_id: str, description: str = ""):
         self.test_id = test_id

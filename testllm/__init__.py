@@ -7,6 +7,7 @@ from .core import (
     AgentUnderTest,
     ApiAgent,
     LocalAgent,
+    # Legacy exports
     ConversationTest,
     UserTurn,
     AgentAssertion,
@@ -14,6 +15,15 @@ from .core import (
     TestResult,
     load_test_file,
     run_test_from_yaml,
+)
+
+# Primary semantic testing interface
+from .semantic import (
+    SemanticTest,
+    SemanticTestResult,
+    SemanticTestCase,
+    semantic_test,
+    pytest_semantic_test,
 )
 
 from .assertions import (
@@ -39,9 +49,19 @@ from .reporting import (
 
 from .__version__ import __version__
 __all__ = [
+    # Core agent interfaces
     "AgentUnderTest",
     "ApiAgent", 
     "LocalAgent",
+    
+    # Primary semantic testing interface
+    "SemanticTest",
+    "SemanticTestResult",
+    "SemanticTestCase", 
+    "semantic_test",
+    "pytest_semantic_test",
+    
+    # Legacy assertion-based testing
     "ConversationTest",
     "UserTurn",
     "AgentAssertion",
@@ -61,6 +81,8 @@ __all__ = [
     "ToolUsageAssertion",
     "AllOfAssertion",
     "AnyOfAssertion",
+    
+    # Reporting
     "TestSuiteReport",
     "export_report",
 ]

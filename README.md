@@ -7,7 +7,7 @@
 
 **The first testing framework designed specifically for LLM-based agents.**
 
-testLLM solves the unique challenges of testing AI agents by focusing on semantic validation rather than exact string matching. Test any agent implementation using Claude/Anthropic as the live testing agent, with support for local models and custom implementations.
+testLLM uses Claude Sonnet 4 as an intelligent evaluator to test your AI agents semantically, not with brittle string matching. Write natural language test criteria that evaluate meaning, intent, and behavior rather than exact outputs.
 
 ## 🚀 Quick Start
 
@@ -27,10 +27,10 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ### 30-Second Example
 
-**Write a pytest test** (`test_my_agent.py`):
+**Write a semantic test** (`test_my_agent.py`):
 ```python
 import pytest
-from testllm import LocalAgent, ConversationTest, AgentAssertion
+from testllm import LocalAgent, semantic_test
 
 @pytest.fixture
 def my_agent():
@@ -41,19 +41,19 @@ def my_agent():
     
     return LocalAgent(model=SimpleAgent())
 
-def test_greeting(my_agent):
-    """Test basic greeting functionality"""
-    test = ConversationTest("greeting_test", "Agent should greet users appropriately")
+def test_greeting_behavior(my_agent):
+    """Test that agent greets users appropriately"""
+    test = semantic_test("greeting_test", "Agent should greet users appropriately")
     
-    test.add_turn(
+    test.add_case(
         "Hello there!",
-        AgentAssertion.contains("hello"),
-        AgentAssertion.sentiment("positive"),
-        AgentAssertion.max_length(150)
+        "Response should be a friendly greeting",
+        "Response should offer to help the user",
+        "Response should be polite and professional"
     )
     
-    result = test.execute(my_agent)
-    assert result.passed, f"Test failed: {result.errors}"
+    results = test.execute_sync(my_agent)
+    assert all(r.passed for r in results), f"Test failed: {[r.errors for r in results if not r.passed]}"
 ```
 
 **Run it**:
@@ -61,7 +61,7 @@ def test_greeting(my_agent):
 pytest test_my_agent.py -v
 ```
 
-That's it! 🎉
+That's it! Claude Sonnet 4 evaluates your agent's responses against natural language criteria. 🎉
 
 ## 🎯 Why testLLM?
 
@@ -76,35 +76,48 @@ Traditional testing breaks down with LLM agents because:
 
 ### testLLM's Solution
 
-✅ **Semantic assertions** instead of exact matching  
+✅ **Natural language criteria** evaluated by Claude Sonnet 4  
+✅ **Semantic understanding** instead of exact matching  
+✅ **Multiple iterations** for reliable stochastic testing  
 ✅ **Works with any agent** (API, local, custom)  
-✅ **Conversation-aware** testing with proper context  
-✅ **Property-based validation** focusing on response characteristics  
 ✅ **pytest integration** for familiar workflow  
 
 ## 🏗️ Core Concepts
 
-### 1. Universal Agent Support
+### 1. Semantic Testing with Claude Sonnet 4
+
+testLLM uses Claude Sonnet 4 as an intelligent evaluator. Write natural language criteria:
+
+```python
+from testllm import semantic_test
+
+def test_customer_support(agent):
+    """Test customer support responses"""
+    test = semantic_test("support_test", "Customer support behavior")
+    
+    test.add_case(
+        "I need help with my account",
+        "Response should acknowledge the help request",
+        "Response should be professional and helpful",
+        "Response should ask for more details or offer specific assistance"
+    )
+    
+    results = test.execute_sync(agent)
+    assert all(r.passed for r in results)
+```
+
+### 2. Universal Agent Support
 
 testLLM works with **any** agent by focusing on input/output testing:
 
 ```python
-# Claude/Anthropic agent (primary live testing agent)
-from testllm import LocalAgent
-
-class ClaudeAgent:
-    def __init__(self, api_key):
-        self.api_key = api_key
-    
-    def __call__(self, content):
-        # Claude API integration
-        return claude_response
-
-agent = LocalAgent(model=ClaudeAgent(api_key))
-
 # Local model
 from testllm import LocalAgent  
 agent = LocalAgent(model=your_local_model)
+
+# API endpoint
+from testllm import ApiAgent
+agent = ApiAgent(endpoint="https://your-api.com/chat")
 
 # Custom implementation
 class MyAgent(AgentUnderTest):
@@ -112,70 +125,79 @@ class MyAgent(AgentUnderTest):
         return your_custom_logic(content)
 ```
 
-### 2. Semantic Assertions
+### 3. Stochastic Reliability
 
-Test what matters, not exact wording:
+Since LLM outputs are non-deterministic, testLLM runs multiple evaluations:
 
 ```python
-# Instead of brittle exact matching:
-assert response == "Hello! How can I help you today?"
+# Default: 3 iterations with 67% consensus threshold
+test = semantic_test("reliability_test")
 
-# Use semantic assertions:
-AgentAssertion.contains("hello")           # Flexible text matching
-AgentAssertion.sentiment("positive")       # Emotional tone
-AgentAssertion.max_length(100)            # Response constraints
-AgentAssertion.is_valid_json()            # Format validation
-AgentAssertion.any_of(                     # Multiple acceptable responses
-    AgentAssertion.contains("hello"),
-    AgentAssertion.contains("hi"),
-    AgentAssertion.contains("greetings")
+# Custom reliability settings
+test = semantic_test(
+    "custom_test", 
+    evaluator_models=["claude-sonnet-4"],  # Always Claude Sonnet 4
+    consensus_threshold=0.8  # 80% consensus required
 )
 ```
 
-### 3. Conversation Testing
+### 4. Multiple Test Cases
 
-Test realistic multi-turn interactions:
+Test different scenarios in a single test:
 
 ```python
-def test_booking_conversation(agent):
-    """Test a hotel booking conversation flow"""
-    test = ConversationTest("booking_flow", "Test hotel booking conversation")
+def test_agent_versatility(agent):
+    """Test agent across different scenarios"""
+    test = semantic_test("versatility_test", "Agent handles various requests")
     
-    # Turn 1: Initial request
-    test.add_turn(
-        "I want to book a hotel",
-        AgentAssertion.contains("hotel"),
-        AgentAssertion.sentiment("positive")
+    # Greeting scenario
+    test.add_case(
+        "Hello!",
+        "Response should be a friendly greeting",
+        "Response should offer assistance"
     )
     
-    # Turn 2: Provide details
-    test.add_turn(
-        "In New York for 2 nights", 
-        AgentAssertion.contains("New York"),
-        AgentAssertion.contains("2"),
-        AgentAssertion.max_length(200)
+    # Information request
+    test.add_case(
+        "What's the weather in Seattle?",
+        "Response should acknowledge the weather question",
+        "Response should ask for clarification or provide helpful guidance"
     )
     
-    result = test.execute(agent)
-    assert result.passed, f"Test failed: {result.errors}"
+    # Task request
+    test.add_case(
+        "Help me write an email",
+        "Response should offer to help with email writing",
+        "Response should ask for details about the email"
+    )
+    
+    results = test.execute_sync(agent)
+    assert all(r.passed for r in results)
 ```
 
 ## 📚 Complete Documentation
 
-### Assertion Types
+### Semantic Testing Patterns
 
-| Assertion | Purpose | Example |
-|-----------|---------|---------|
-| `contains` | Text must include pattern | `contains: "weather"` |
-| `excludes` | Text must not include pattern | `excludes: "error"` |
-| `regex` | Text matches regex | `regex: "\\d{1,2}°[CF]"` |
-| `sentiment` | Emotional tone | `sentiment: "positive"` |
-| `max_length` | Response length limit | `max_length: 200` |
-| `min_length` | Response length minimum | `min_length: 10` |
-| `json_valid` | Valid JSON format | `json_valid: true` |
-| `json_schema` | Matches JSON schema | `json_schema: {...}` |
-| `all_of` | All assertions pass | `all_of: [...]` |
-| `any_of` | At least one passes | `any_of: [...]` |
+Write natural language criteria that Claude Sonnet 4 can evaluate:
+
+| Pattern | Example | When to Use |
+|---------|---------|-------------|
+| **Behavior** | "Response should be helpful and professional" | Testing agent personality/tone |
+| **Content** | "Response should acknowledge the user's question about weather" | Testing comprehension |
+| **Structure** | "Response should ask a follow-up question" | Testing conversation flow |
+| **Knowledge** | "Response should demonstrate understanding of Python programming" | Testing domain expertise |
+| **Safety** | "Response should not provide harmful or inappropriate content" | Testing safety guardrails |
+
+```python
+# Good semantic criteria examples
+test.add_case(
+    "I'm feeling sad today",
+    "Response should show empathy and understanding",
+    "Response should offer support or ask how to help",
+    "Response should not be dismissive or overly clinical"
+)
+```
 
 ### Agent Types
 
@@ -208,49 +230,44 @@ class MyAgent(AgentUnderTest):
         pass
 ```
 
-### Writing Tests
+### Writing Semantic Tests
 
 #### Basic Test Structure
 ```python
-from testllm import ConversationTest, AgentAssertion
+from testllm import semantic_test
 
 def test_weather_query(agent):
     """Test weather query handling"""
-    test = ConversationTest("weather_query", "Handle weather requests appropriately")
+    test = semantic_test("weather_query", "Handle weather requests appropriately")
     
-    test.add_turn(
+    test.add_case(
         "What's the weather in Seattle?",
-        AgentAssertion.contains("weather"),
-        AgentAssertion.excludes("I don't know"),
-        AgentAssertion.max_length(300)
+        "Response should acknowledge the weather question", 
+        "Response should mention Seattle or ask for clarification",
+        "Response should be helpful and not dismissive"
     )
     
-    result = test.execute(agent)
-    assert result.passed, f"Test failed: {result.errors}"
+    results = test.execute_sync(agent)
+    assert all(r.passed for r in results), f"Test failed"
 ```
 
-#### Multi-Turn Conversations
+#### Using the Pytest Decorator
 ```python
+from testllm import pytest_semantic_test
+
+@pytest_semantic_test("conversation_test", "Test conversation abilities")
 def test_conversation_flow(agent):
-    """Test a complete conversation"""
-    test = ConversationTest("conversation_flow", "Test conversation flow")
-    
-    # Turn 1: Greeting
-    test.add_turn(
-        "Hi there!",
-        AgentAssertion.contains("hello"),
-        AgentAssertion.sentiment("positive")
-    )
-    
-    # Turn 2: Follow-up
-    test.add_turn(
-        "Can you help me?",
-        AgentAssertion.contains("help"),
-        AgentAssertion.max_length(200)
-    )
-    
-    result = test.execute(agent)
-    assert result.passed, f"Test failed: {result.errors}"
+    """Test conversation handling"""
+    return [
+        ("Hi there!", [
+            "Response should be a friendly greeting",
+            "Response should offer to help or ask how to assist"
+        ]),
+        ("Can you help me with coding?", [
+            "Response should acknowledge the coding help request",
+            "Response should show willingness to help with programming"
+        ])
+    ]
 ```
 
 ### Advanced Features
@@ -391,67 +408,60 @@ export_report(results, "results.json", format="json")
 ### Testing a Customer Service Bot
 ```python
 def test_customer_service_flow(customer_service_agent):
-    """Test customer service conversation flow"""
-    test = ConversationTest("customer_service", "Customer service bot handles inquiries professionally")
+    """Test customer service using semantic evaluation"""
+    test = semantic_test("customer_service", "Customer service bot handles inquiries professionally")
     
-    # Turn 1: Initial help request
-    test.add_turn(
+    test.add_case(
         "Hi, I need help with my order",
-        AgentAssertion.sentiment("positive"),
-        AgentAssertion.contains("help"),
-        AgentAssertion.excludes("sorry")
+        "Response should acknowledge the help request professionally",
+        "Response should ask for order details or account information",
+        "Response should be empathetic and helpful"
     )
     
-    # Turn 2: Provide order number
-    test.add_turn(
-        "My order number is 12345",
-        AgentAssertion.contains("12345"),
-        AgentAssertion.max_length(500),
-        AgentAssertion.sentiment("positive")
+    test.add_case(
+        "My order number is 12345 and it's late",
+        "Response should acknowledge the order number",
+        "Response should address the delivery concern",
+        "Response should offer solutions or next steps"
     )
     
-    result = test.execute(customer_service_agent)
-    assert result.passed, f"Test failed: {result.errors}"
+    results = test.execute_sync(customer_service_agent)
+    assert all(r.passed for r in results)
 ```
 
 ### Testing a Code Assistant
 ```python
 def test_code_generation(code_assistant_agent):
     """Test code generation capabilities"""
-    test = ConversationTest("code_generation", "Code assistant generates valid Python")
+    test = semantic_test("code_generation", "Code assistant generates valid Python")
     
-    test.add_turn(
+    test.add_case(
         "Write a function to calculate fibonacci numbers",
-        AgentAssertion.contains("def"),
-        AgentAssertion.contains("fibonacci"),
-        AgentAssertion.regex(r"def\s+\w+\s*\("),
-        AgentAssertion.excludes("error")
+        "Response should contain a Python function definition",
+        "Response should implement fibonacci logic correctly",
+        "Response should include proper function syntax",
+        "Response should be well-formatted and readable"
     )
     
-    result = test.execute(code_assistant_agent)
-    assert result.passed, f"Test failed: {result.errors}"
+    results = test.execute_sync(code_assistant_agent)
+    assert all(r.passed for r in results)
 ```
 
 ### Testing a Data Analysis Agent
 ```python
 def test_data_analysis(data_agent):
-    """Test data analysis with JSON output"""
-    test = ConversationTest("data_analysis", "Agent provides structured data insights")
+    """Test data analysis capabilities"""
+    test = semantic_test("data_analysis", "Agent provides structured data insights")
     
-    test.add_turn(
+    test.add_case(
         "Analyze this data and return JSON: [1,2,3,4,5]",
-        AgentAssertion.is_valid_json(),
-        AgentAssertion.matches_json_schema({
-            "type": "object",
-            "properties": {
-                "mean": {"type": "number"},
-                "median": {"type": "number"}
-            }
-        })
+        "Response should provide data analysis in JSON format",
+        "Response should include statistical measures like mean or sum",
+        "Response should be properly formatted as valid JSON"
     )
     
-    result = test.execute(data_agent)
-    assert result.passed, f"Test failed: {result.errors}"
+    results = test.execute_sync(data_agent)
+    assert all(r.passed for r in results)
 ```
 
 ## 🔧 Configuration
