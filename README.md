@@ -27,60 +27,37 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 
 ### 30-Second Example
 
-**Write a production flow test** (`test_my_agent.py`):
+**Write a semantic test** (`test_my_agent.py`):
 ```python
 import pytest
-from testllm import LocalAgent, conversation_flow
+from testllm import LocalAgent, semantic_test
 
 @pytest.fixture
 def my_agent():
     # Your agent implementation here
-    class CustomerServiceAgent:
+    class WeatherAgent:
         def __call__(self, prompt):
-            if "new customer" in prompt.lower():
-                return "Welcome! I'll help you get started with our onboarding process."
-            elif "name is" in prompt.lower():
-                return "Nice to meet you! I've noted your information."
-            return "I understand your request. How can I help you further?"
+            if "weather" in prompt.lower():
+                return "I'll check the current weather conditions for you."
+            return "I understand your request. How can I help?"
     
-    return LocalAgent(model=CustomerServiceAgent())
+    return LocalAgent(model=WeatherAgent())
 
-def test_customer_onboarding_flow(my_agent):
-    """Test complete customer onboarding workflow"""
-    flow = conversation_flow("onboarding", "Customer onboarding process")
+def test_weather_query_response(my_agent):
+    """Test weather query handling"""
+    test = semantic_test("weather_test", "Weather query handling")
     
-    # Step 1: Initial contact
-    flow.step(
-        "Hello, I'm a new customer interested in your services",
+    test.add_scenario(
+        user_input="What's the weather in Seattle?",
         criteria=[
-            "Response should acknowledge new customer status",
-            "Response should begin onboarding process",
-            "Response should be professional and welcoming"
+            "Response should acknowledge the weather question",
+            "Response should mention checking or retrieving weather data",
+            "Response should be helpful and professional"
         ]
     )
     
-    # Step 2: Information gathering with context retention
-    flow.step(
-        "My name is Sarah and I need a business account",
-        criteria=[
-            "Response should acknowledge the name Sarah",
-            "Response should understand business account requirement"
-        ],
-        expect_context_retention=True
-    )
-    
-    # Step 3: Memory validation
-    flow.context_check(
-        "What type of account was I requesting?",
-        context_criteria=[
-            "Response should remember business account request",
-            "Response should demonstrate conversation awareness"
-        ]
-    )
-    
-    result = flow.execute_sync(my_agent)
-    assert result.passed, f"Flow failed: {result.flow_errors}"
-    assert result.context_retention_score >= 0.7, "Poor context retention"
+    results = test.execute_sync(my_agent)
+    assert all(r.passed for r in results), "Weather test failed"
 ```
 
 **Run it**:
@@ -88,7 +65,7 @@ def test_customer_onboarding_flow(my_agent):
 pytest test_my_agent.py -v
 ```
 
-That's it! Claude Sonnet 4 evaluates your agent's behavior across multi-step conversations, testing context retention, tool usage patterns, and business logic compliance. 🎉
+That's it! Claude Sonnet 4 evaluates your agent's response semantically, understanding meaning rather than requiring exact text matches. 🎉
 
 ## 🎯 Why testLLM?
 
@@ -111,53 +88,86 @@ Traditional testing breaks down with LLM agents because:
 
 ## 🏗️ Core Concepts
 
-### 1. Production Flow Testing
+### 1. Semantic Testing (Single Turn)
 
-testLLM's primary focus is testing **production agentic systems** through multi-step conversation flows:
+testLLM's foundation is semantic testing - evaluating individual agent responses with natural language criteria:
 
 ```python
-from testllm import conversation_flow, BusinessLogicPatterns
+from testllm import semantic_test
 
-def test_e_commerce_workflow(agent):
-    """Test complete e-commerce purchase flow"""
-    flow = conversation_flow("purchase", "E-commerce purchase workflow")
+def test_agent_responses(agent):
+    """Test individual agent responses semantically"""
+    test = semantic_test("response_test", "Semantic response testing")
     
-    # Product discovery with tool usage
-    flow.tool_usage_check(
-        "I'm looking for a laptop for machine learning",
-        expected_tools=["product_search", "ml_filter"],
+    # Test weather query
+    test.add_scenario(
+        user_input="What's the weather in Seattle?",
         criteria=[
-            "Response should search product catalog",
-            "Response should understand ML requirements"
+            "Response should acknowledge the weather question",
+            "Response should mention checking or retrieving weather data",
+            "Response should be helpful and professional"
         ]
     )
     
-    # Business logic validation
-    flow.business_logic_check(
-        "I want the Dell XPS, what's the price?",
-        business_rules=["inventory_check", "pricing"],
+    # Test customer support
+    test.add_scenario(
+        user_input="I need help with my account",
         criteria=[
-            "Response should check availability",
-            "Response should provide current pricing"
+            "Response should offer assistance",
+            "Response should be empathetic and professional",
+            "Response should not dismiss the request"
         ]
     )
     
-    # Context retention across steps
+    results = test.execute_sync(agent)
+    assert all(r.passed for r in results)
+```
+
+### 2. Production Flow Testing
+
+For complex scenarios, test multi-step conversation flows with context retention and business logic:
+
+```python
+from testllm import conversation_flow
+
+def test_customer_onboarding_flow(agent):
+    """Test complete customer onboarding workflow"""
+    flow = conversation_flow("onboarding", "Customer onboarding process")
+    
+    # Step 1: Initial contact
+    flow.step(
+        "Hello, I'm a new customer interested in your services",
+        criteria=[
+            "Response should acknowledge new customer status",
+            "Response should begin onboarding process"
+        ]
+    )
+    
+    # Step 2: Information gathering with context retention
+    flow.step(
+        "My name is Sarah and I need a business account",
+        criteria=[
+            "Response should acknowledge the name Sarah",
+            "Response should understand business account requirement"
+        ],
+        expect_context_retention=True
+    )
+    
+    # Step 3: Memory validation
     flow.context_check(
-        "Can I get expedited shipping for that laptop?",
+        "What type of account was I requesting?",
         context_criteria=[
-            "Response should reference the Dell XPS from previous step",
-            "Response should offer shipping options"
+            "Response should remember business account request",
+            "Response should demonstrate conversation awareness"
         ]
     )
     
     result = flow.execute_sync(agent)
     assert result.passed
-    assert result.business_logic_score >= 0.8
     assert result.context_retention_score >= 0.7
 ```
 
-### 2. Behavioral Pattern Testing
+### 3. Behavioral Pattern Testing
 
 Pre-built patterns for common agentic behaviors:
 
@@ -189,7 +199,7 @@ def test_agent_patterns(agent):
     assert all(r.passed for r in results)
 ```
 
-### 3. Universal Agent Support
+### 4. Universal Agent Support
 
 testLLM works with **any** agent through black-box testing:
 
@@ -208,41 +218,20 @@ class MyAgent(AgentUnderTest):
         return your_custom_logic(content)
 ```
 
-### 4. Intelligent Evaluation with Claude Sonnet 4
+### 5. Intelligent Evaluation with Claude Sonnet 4
 
 All testing uses Claude Sonnet 4 as an intelligent evaluator:
 
 ```python
 # Default: 3 iterations with 67% consensus threshold for reliability
-flow = conversation_flow("test_id")
+test = semantic_test("test_id")
 
 # Custom evaluation settings
-flow = conversation_flow(
+test = semantic_test(
     "custom_test", 
     evaluator_models=["claude-sonnet-4"],  # Always Claude Sonnet 4
     consensus_threshold=0.8  # 80% consensus required
 )
-```
-
-### 5. Semantic Testing (Single Turn)
-
-For simpler scenarios, test individual responses:
-
-```python
-def test_single_response(agent):
-    """Test individual agent responses"""
-    test = semantic_test("response_test", "Single response testing")
-    
-    test.add_scenario(
-        user_input="What's the weather in Seattle?",
-        criteria=[
-            "Response should acknowledge the weather question",
-            "Response should ask for clarification or provide helpful guidance"
-        ]
-    )
-    
-    results = test.execute_sync(agent)
-    assert all(r.passed for r in results)
 ```
 
 ## 📚 Complete Documentation
@@ -310,34 +299,43 @@ def test_weather_query(agent):
     """Test weather query handling"""
     test = semantic_test("weather_query", "Handle weather requests appropriately")
     
-    test.add_case(
-        "What's the weather in Seattle?",
-        "Response should acknowledge the weather question", 
-        "Response should mention Seattle or ask for clarification",
-        "Response should be helpful and not dismissive"
+    test.add_scenario(
+        user_input="What's the weather in Seattle?",
+        criteria=[
+            "Response should acknowledge the weather question", 
+            "Response should mention Seattle or ask for clarification",
+            "Response should be helpful and not dismissive"
+        ]
     )
     
     results = test.execute_sync(agent)
     assert all(r.passed for r in results), f"Test failed"
 ```
 
-#### Using the Pytest Decorator
+#### Using Multiple Scenarios
 ```python
-from testllm import pytest_semantic_test
-
-@pytest_semantic_test("conversation_test", "Test conversation abilities")
-def test_conversation_flow(agent):
+def test_conversation_abilities(agent):
     """Test conversation handling"""
-    return [
-        ("Hi there!", [
+    test = semantic_test("conversation_test", "Test conversation abilities")
+    
+    test.add_scenario(
+        user_input="Hi there!",
+        criteria=[
             "Response should be a friendly greeting",
             "Response should offer to help or ask how to assist"
-        ]),
-        ("Can you help me with coding?", [
+        ]
+    )
+    
+    test.add_scenario(
+        user_input="Can you help me with coding?",
+        criteria=[
             "Response should acknowledge the coding help request",
             "Response should show willingness to help with programming"
-        ])
-    ]
+        ]
+    )
+    
+    results = test.execute_sync(agent)
+    assert all(r.passed for r in results)
 ```
 
 ### Advanced Features
@@ -475,7 +473,79 @@ export_report(results, "results.json", format="json")
 
 ## 🏆 Real-World Examples
 
-### Testing a Customer Service Bot
+### Basic Semantic Testing Examples
+
+```python
+def test_customer_service_responses(customer_service_agent):
+    """Test individual customer service responses"""
+    test = semantic_test("customer_service", "Customer service response testing")
+    
+    # Test greeting handling
+    test.add_scenario(
+        user_input="Hello, I need help with my account",
+        criteria=[
+            "Response should acknowledge the greeting",
+            "Response should offer to help with account issues",
+            "Response should be professional and welcoming"
+        ]
+    )
+    
+    # Test complaint handling
+    test.add_scenario(
+        user_input="I'm frustrated with the service I received",
+        criteria=[
+            "Response should acknowledge the frustration",
+            "Response should show empathy",
+            "Response should offer to resolve the issue"
+        ]
+    )
+    
+    # Test technical questions
+    test.add_scenario(
+        user_input="How do I reset my password?",
+        criteria=[
+            "Response should understand the password reset request",
+            "Response should provide clear instructions or next steps",
+            "Response should be helpful and not dismissive"
+        ]
+    )
+    
+    results = test.execute_sync(customer_service_agent)
+    assert all(r.passed for r in results)
+```
+
+```python
+def test_weather_agent_responses(weather_agent):
+    """Test weather agent semantic responses"""
+    test = semantic_test("weather_responses", "Weather query handling")
+    
+    # Test location-specific queries
+    test.add_scenario(
+        user_input="What's the weather in Paris?",
+        criteria=[
+            "Response should acknowledge Paris as the location",
+            "Response should indicate weather data retrieval",
+            "Response should be informative"
+        ]
+    )
+    
+    # Test general weather questions
+    test.add_scenario(
+        user_input="Will it rain today?",
+        criteria=[
+            "Response should address the rain question",
+            "Response should ask for location if needed",
+            "Response should be helpful"
+        ]
+    )
+    
+    results = test.execute_sync(weather_agent)
+    assert all(r.passed for r in results)
+```
+
+### Flow Testing Examples
+
+#### Testing a Customer Service Bot
 ```python
 def test_customer_service_escalation_flow(customer_service_agent):
     """Test complete customer service escalation workflow"""
