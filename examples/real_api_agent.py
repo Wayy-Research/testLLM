@@ -50,12 +50,11 @@ anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
 if not anthropic_api_key:
     raise ValueError("ANTHROPIC_API_KEY environment variable is required")
 
-claude_model = AnthropicModel('claude-3-haiku-20240307', api_key=anthropic_api_key)
+claude_model = AnthropicModel('claude-sonnet-4-20250514')
 
 # Create agent
 api_agent = Agent(
     model=claude_model,
-    result_type=str,
     system_prompt="""You are a helpful assistant that can:
     1. Look up user information and their posts
     2. Get weather information for cities
@@ -66,7 +65,7 @@ api_agent = Agent(
 )
 
 
-@api_agent.tool
+@api_agent.tool_plain
 def get_user_info(user_id: int) -> UserInfo:
     """Get user information from JSONPlaceholder API"""
     try:
@@ -94,7 +93,7 @@ def get_user_info(user_id: int) -> UserInfo:
         )
 
 
-@api_agent.tool
+@api_agent.tool_plain
 def get_user_posts(user_id: int) -> List[PostInfo]:
     """Get posts by a specific user from JSONPlaceholder API"""
     try:
@@ -123,7 +122,7 @@ def get_user_posts(user_id: int) -> List[PostInfo]:
         )]
 
 
-@api_agent.tool
+@api_agent.tool_plain
 def get_weather(city: str) -> WeatherInfo:
     """Get weather information - uses HTTPBin for demo purposes"""
     try:
@@ -163,7 +162,7 @@ def get_weather(city: str) -> WeatherInfo:
         )
 
 
-@api_agent.tool
+@api_agent.tool_plain
 def test_http_request(method: str = "GET", test_type: str = "status") -> Dict[str, Any]:
     """Test HTTP requests using HTTPBin - useful for debugging API issues"""
     try:

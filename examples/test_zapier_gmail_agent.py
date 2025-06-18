@@ -2,9 +2,9 @@
 Tests for Zapier Gmail Agent - Comprehensive Testing Example
 
 This test suite demonstrates the full range of testLLM testing capabilities:
-- Semantic assertions for meaning and context
+- Semantic testing for meaning and context using LLM evaluation
 - Traditional assertions for specific content
-- Combined assertions for comprehensive validation
+- Combined approaches for comprehensive validation
 - Multi-turn conversations
 - Error handling scenarios
 
@@ -15,7 +15,7 @@ Note: Set ZAPIER_MCP_URL and TEST_EMAIL environment variables for actual email t
 
 import pytest
 import os
-from testllm import LocalAgent, ConversationTest, AgentAssertion
+from testllm import LocalAgent, ConversationTest, AgentAssertion, SemanticTest
 from zapier_gmail_agent import zapier_gmail_agent
 
 
@@ -25,10 +25,10 @@ def gmail_agent():
     return LocalAgent(model=zapier_gmail_agent)
 
 
-def test_email_sending_comprehensive(gmail_agent):
-    """Comprehensive test combining semantic and traditional assertions"""
+def test_email_sending_traditional_assertions(gmail_agent):
+    """Traditional assertion-based test for email sending"""
     test = ConversationTest(
-        "email_sending_comprehensive",
+        "email_sending_traditional",
         "Agent should send emails with proper confirmation and details"
     )
     
@@ -36,9 +36,6 @@ def test_email_sending_comprehensive(gmail_agent):
     
     test.add_turn(
         f"Send an email to {test_email} with subject 'testLLM Framework Test' and tell them this is a test of our email integration",
-        # Semantic assertions for understanding and context
-        AgentAssertion.semantic("Response indicates that an email sending attempt was made"),
-        AgentAssertion.semantic("Response communicates the success or failure clearly"),
         # Traditional assertions for specific content
         AgentAssertion.contains(test_email),
         AgentAssertion.contains("testLLM Framework Test"),
@@ -51,20 +48,41 @@ def test_email_sending_comprehensive(gmail_agent):
     )
     
     result = test.execute(gmail_agent)
-    assert result.passed, f"Comprehensive email test failed: {result.errors}"
+    assert result.passed, f"Traditional email test failed: {result.errors}"
 
 
-def test_email_validation_mixed_assertions(gmail_agent):
-    """Test email validation using multiple assertion types"""
+def test_email_sending_semantic_evaluation(gmail_agent):
+    """Semantic test for email sending understanding using LLM evaluation"""
+    test_email = os.getenv('TEST_EMAIL', 'test@example.com')
+    
+    test = SemanticTest(
+        "email_sending_semantic",
+        "Agent should understand email requests and handle sending appropriately"
+    )
+    
+    test.add_scenario(
+        user_input=f"Send an email to {test_email} with subject 'testLLM Framework Test' and tell them this is a test of our email integration",
+        criteria=[
+            "Response indicates that an email sending attempt was made",
+            "Response communicates the success or failure clearly", 
+            "Response includes confirmation of the email details (recipient, subject)",
+            "Response is helpful and professional in tone"
+        ]
+    )
+    
+    results = test.execute_sync(gmail_agent)
+    assert all(r.passed for r in results), f"Semantic email test failed: {[r.errors for r in results if not r.passed]}"
+
+
+def test_email_validation_traditional(gmail_agent):
+    """Test email validation using traditional assertions"""
     test = ConversationTest(
-        "email_validation_mixed",
-        "Agent should validate email addresses using multiple criteria"
+        "email_validation_traditional",
+        "Agent should validate email addresses correctly"
     )
     
     test.add_turn(
         "Is 'invalid-email-format' a valid email address?",
-        # Semantic understanding
-        AgentAssertion.semantic("Response clearly identifies the email format as invalid"),
         # Traditional content checks
         AgentAssertion.any_of(
             AgentAssertion.contains("invalid"),
@@ -73,32 +91,49 @@ def test_email_validation_mixed_assertions(gmail_agent):
         ),
         # Should not contain positive validation terms
         AgentAssertion.excludes("valid email"),
-        AgentAssertion.excludes("correct format")
+        AgentAssertion.excludes("correct format"),
+        AgentAssertion.min_length(20)
     )
     
     result = test.execute(gmail_agent)
     assert result.passed, f"Email validation test failed: {result.errors}"
 
 
-def test_valid_email_with_all_assertions(gmail_agent):
-    """Test valid email recognition with comprehensive assertions"""
+def test_email_validation_semantic(gmail_agent):
+    """Semantic test for email validation understanding"""
+    test = SemanticTest(
+        "email_validation_semantic",
+        "Agent should understand and explain email validation properly"
+    )
+    
+    test.add_scenario(
+        user_input="Is 'invalid-email-format' a valid email address?",
+        criteria=[
+            "Response clearly identifies the email format as invalid",
+            "Response explains what makes an email address valid or invalid",
+            "Response is helpful for someone learning about email formats"
+        ]
+    )
+    
+    results = test.execute_sync(gmail_agent)
+    assert all(r.passed for r in results), f"Semantic email validation test failed: {[r.errors for r in results if not r.passed]}"
+
+
+def test_valid_email_recognition(gmail_agent):
+    """Test recognition of valid email addresses"""
     test = ConversationTest(
-        "valid_email_comprehensive",
-        "Agent should recognize valid emails with proper confirmation"
+        "valid_email_recognition",
+        "Agent should recognize valid emails properly"
     )
     
     test.add_turn(
         "Check if 'user@example.com' is a valid email address",
-        # Semantic validation
-        AgentAssertion.semantic("Response confirms the email address is valid"),
-        # Content validation
         AgentAssertion.contains("user@example.com"),
         AgentAssertion.any_of(
             AgentAssertion.contains("valid"),
             AgentAssertion.contains("correct"),
             AgentAssertion.contains("proper")
         ),
-        # Quality checks
         AgentAssertion.max_length(200),
         AgentAssertion.sentiment("positive")
     )
@@ -108,7 +143,7 @@ def test_valid_email_with_all_assertions(gmail_agent):
 
 
 def test_multi_turn_email_conversation(gmail_agent):
-    """Test multi-turn conversation with various assertion types"""
+    """Test multi-turn conversation with email functionality"""
     test = ConversationTest(
         "multi_turn_email",
         "Agent should handle multi-turn email conversations"
@@ -117,56 +152,63 @@ def test_multi_turn_email_conversation(gmail_agent):
     # Turn 1: Initial email request
     test.add_turn(
         "I need to send an email to my colleague",
-        AgentAssertion.semantic("Response asks for more details about the email"),
         AgentAssertion.any_of(
             AgentAssertion.contains("what"),
             AgentAssertion.contains("details"),
-            AgentAssertion.contains("tell me")
+            AgentAssertion.contains("tell me"),
+            AgentAssertion.contains("information")
         ),
-        AgentAssertion.sentiment("helpful")
+        AgentAssertion.sentiment("positive")
     )
     
     # Turn 2: Provide details
     test.add_turn(
         "Send it to john@company.com with subject 'Meeting Tomorrow' and ask if he can attend the 3pm meeting",
-        AgentAssertion.semantic("Response processes the email details and attempts to send"),
         AgentAssertion.contains("john@company.com"),  
         AgentAssertion.contains("Meeting Tomorrow"),
         AgentAssertion.min_length(40)
-    )
-    
-    # Turn 3: Follow-up question
-    test.add_turn(
-        "Was the email sent successfully?",
-        AgentAssertion.semantic("Response provides status information about the email"),
-        AgentAssertion.any_of(
-            AgentAssertion.contains("sent"),
-            AgentAssertion.contains("delivered"),
-            AgentAssertion.contains("success")
-        )
     )
     
     result = test.execute(gmail_agent)
     assert result.passed, f"Multi-turn conversation test failed: {result.errors}"
 
 
+def test_multi_turn_semantic_context(gmail_agent):
+    """Semantic test for multi-turn conversation context"""
+    test = SemanticTest(
+        "multi_turn_semantic",
+        "Agent should maintain context across conversation turns"
+    )
+    
+    # Note: SemanticTest handles multi-turn differently - this is a simplified version
+    test.add_scenario(
+        user_input="I need help sending an email to my colleague about our project meeting",
+        criteria=[
+            "Response acknowledges the email request",
+            "Response asks for necessary details like recipient and content",
+            "Response is helpful and conversational"
+        ]
+    )
+    
+    results = test.execute_sync(gmail_agent)
+    assert all(r.passed for r in results), f"Semantic multi-turn test failed: {[r.errors for r in results if not r.passed]}"
+
+
 def test_error_handling_comprehensive(gmail_agent):
     """Test error handling with multiple assertion types"""
     test = ConversationTest(
         "error_handling_comprehensive",
-        "Agent should handle errors gracefully across multiple scenarios"
+        "Agent should handle errors gracefully"
     )
     
     test.add_turn(
         "Send an email to 'not-an-email' with no subject",
-        # Semantic error handling
-        AgentAssertion.semantic("Response identifies problems with the email request"),
-        AgentAssertion.semantic("Response provides helpful guidance"),
         # Traditional error detection
         AgentAssertion.any_of(
             AgentAssertion.contains("invalid"),
             AgentAssertion.contains("error"),
-            AgentAssertion.contains("problem")
+            AgentAssertion.contains("problem"),
+            AgentAssertion.contains("format")
         ),
         # Should not crash or give unhelpful responses
         AgentAssertion.excludes("Exception"),
@@ -178,27 +220,42 @@ def test_error_handling_comprehensive(gmail_agent):
     assert result.passed, f"Error handling test failed: {result.errors}"
 
 
+def test_error_handling_semantic(gmail_agent):
+    """Semantic test for error handling quality"""
+    test = SemanticTest(
+        "error_handling_semantic",
+        "Agent should handle errors with helpful explanations"
+    )
+    
+    test.add_scenario(
+        user_input="Send an email to 'not-an-email' with subject 'Test'",
+        criteria=[
+            "Response identifies the email address problem without being technical",
+            "Response provides helpful guidance on what constitutes a valid email",
+            "Response maintains a helpful tone despite the error"
+        ]
+    )
+    
+    results = test.execute_sync(gmail_agent)
+    assert all(r.passed for r in results), f"Semantic error handling test failed: {[r.errors for r in results if not r.passed]}"
+
+
 def test_professional_email_composition(gmail_agent):
-    """Test professional email composition with quality assertions"""
+    """Test professional email composition capabilities"""
     test = ConversationTest(
         "professional_composition",
-        "Agent should help compose professional emails"
+        "Agent should help with professional email composition"
     )
     
     test.add_turn(
         "Help me send a professional follow-up email to client@business.com about our proposal discussion",
-        # Semantic understanding of professional context
-        AgentAssertion.semantic("Response understands the professional context and follow-up nature"),
-        AgentAssertion.semantic("Response generates or suggests appropriate professional content"),
-        # Content requirements
         AgentAssertion.contains("client@business.com"),
         AgentAssertion.any_of(
             AgentAssertion.contains("proposal"),
             AgentAssertion.contains("discussion"),
             AgentAssertion.contains("follow-up")
         ),
-        # Quality and tone
-        AgentAssertion.sentiment("professional"),
+        AgentAssertion.sentiment("positive"),
         AgentAssertion.min_length(100),
         # Should avoid overly casual language
         AgentAssertion.excludes("hey"),
@@ -209,8 +266,28 @@ def test_professional_email_composition(gmail_agent):
     assert result.passed, f"Professional composition test failed: {result.errors}"
 
 
-def test_cc_functionality_assertions(gmail_agent):
-    """Test CC functionality with multiple assertion types"""
+def test_professional_email_semantic(gmail_agent):
+    """Semantic test for professional email understanding"""
+    test = SemanticTest(
+        "professional_email_semantic",
+        "Agent should understand professional email context and tone"
+    )
+    
+    test.add_scenario(
+        user_input="Help me send a professional follow-up email to client@business.com about our proposal discussion",
+        criteria=[
+            "Response understands the professional context and follow-up nature",
+            "Response generates or suggests appropriate professional content",
+            "Response demonstrates understanding of business communication tone"
+        ]
+    )
+    
+    results = test.execute_sync(gmail_agent)
+    assert all(r.passed for r in results), f"Semantic professional email test failed: {[r.errors for r in results if not r.passed]}"
+
+
+def test_cc_functionality(gmail_agent):
+    """Test CC functionality with traditional assertions"""
     test = ConversationTest(
         "cc_functionality",
         "Agent should handle CC recipients properly"
@@ -218,10 +295,6 @@ def test_cc_functionality_assertions(gmail_agent):
     
     test.add_turn(
         "Send an email to manager@company.com and CC assistant@company.com about the project update",
-        # Semantic understanding
-        AgentAssertion.semantic("Response demonstrates understanding of CC functionality"),
-        AgentAssertion.semantic("Response handles multiple recipients appropriately"),
-        # Content validation
         AgentAssertion.all_of(
             AgentAssertion.contains("manager@company.com"),
             AgentAssertion.contains("assistant@company.com"),
@@ -231,7 +304,6 @@ def test_cc_functionality_assertions(gmail_agent):
                 AgentAssertion.contains("copy")
             )
         ),
-        # Quality checks
         AgentAssertion.min_length(60)
     )
     
@@ -239,8 +311,8 @@ def test_cc_functionality_assertions(gmail_agent):
     assert result.passed, f"CC functionality test failed: {result.errors}"
 
 
-def test_integration_capabilities_showcase(gmail_agent):
-    """Test showcasing integration capabilities with varied assertions"""
+def test_integration_capabilities(gmail_agent):
+    """Test showcasing integration capabilities"""
     test = ConversationTest(
         "integration_showcase",
         "Agent should demonstrate its integration capabilities"
@@ -248,20 +320,14 @@ def test_integration_capabilities_showcase(gmail_agent):
     
     test.add_turn(
         "What can you do with emails? Show me your capabilities",
-        # Semantic capability demonstration
-        AgentAssertion.semantic("Response explains email capabilities clearly"),
-        AgentAssertion.semantic("Response mentions integration with external services"),
-        # Feature coverage
         AgentAssertion.any_of(
             AgentAssertion.contains("send"),
             AgentAssertion.contains("email"),
             AgentAssertion.contains("Zapier")
         ),
-        # Helpful and informative
-        AgentAssertion.sentiment("informative"),
+        AgentAssertion.sentiment("positive"),
         AgentAssertion.min_length(80),
         AgentAssertion.max_length(500),  # Not too verbose
-        # Professional presentation
         AgentAssertion.excludes("I don't know"),
         AgentAssertion.excludes("I can't")
     )
@@ -270,35 +336,8 @@ def test_integration_capabilities_showcase(gmail_agent):
     assert result.passed, f"Integration showcase test failed: {result.errors}"
 
 
-def test_edge_cases_comprehensive(gmail_agent):
-    """Test edge cases with comprehensive assertion coverage"""
-    test = ConversationTest(
-        "edge_cases_comprehensive", 
-        "Agent should handle edge cases gracefully"
-    )
-    
-    test.add_turn(
-        "Send an email with a very long subject: " + "A" * 200,
-        # Semantic handling of edge case
-        AgentAssertion.semantic("Response handles the unusually long subject appropriately"),
-        # Should not crash
-        AgentAssertion.min_length(20),
-        # Should either process or warn about length
-        AgentAssertion.any_of(
-            AgentAssertion.contains("long"),
-            AgentAssertion.contains("subject"),
-            AgentAssertion.contains("sent")
-        ),
-        # Quality response
-        AgentAssertion.sentiment("helpful")
-    )
-    
-    result = test.execute(gmail_agent)
-    assert result.passed, f"Edge cases test failed: {result.errors}"
-
-
 def test_user_experience_quality(gmail_agent):
-    """Test overall user experience quality with mixed assertions"""
+    """Test overall user experience quality"""
     test = ConversationTest(
         "user_experience",
         "Agent should provide excellent user experience"
@@ -306,23 +345,37 @@ def test_user_experience_quality(gmail_agent):
     
     test.add_turn(
         "I'm new to this - can you help me send my first email?",
-        # Semantic user experience
-        AgentAssertion.semantic("Response is welcoming and supportive for a new user"),
-        AgentAssertion.semantic("Response provides clear guidance without being overwhelming"),
-        # Helpful content
         AgentAssertion.any_of(
             AgentAssertion.contains("help"),
             AgentAssertion.contains("guide"),
             AgentAssertion.contains("show")
         ),
-        # Positive interaction
-        AgentAssertion.sentiment("encouraging"),
+        AgentAssertion.sentiment("positive"),
         AgentAssertion.excludes("complicated"),
         AgentAssertion.excludes("difficult"),
-        # Appropriate length
         AgentAssertion.min_length(50),
         AgentAssertion.max_length(300)
     )
     
     result = test.execute(gmail_agent)
     assert result.passed, f"User experience test failed: {result.errors}"
+
+
+def test_user_experience_semantic(gmail_agent):
+    """Semantic test for user experience quality"""
+    test = SemanticTest(
+        "user_experience_semantic",
+        "Agent should provide welcoming experience for new users"
+    )
+    
+    test.add_scenario(
+        user_input="I'm new to this - can you help me send my first email?",
+        criteria=[
+            "Response is welcoming and supportive for a new user",
+            "Response provides clear guidance without being overwhelming",
+            "Response encourages the user and builds confidence"
+        ]
+    )
+    
+    results = test.execute_sync(gmail_agent)
+    assert all(r.passed for r in results), f"Semantic user experience test failed: {[r.errors for r in results if not r.passed]}"

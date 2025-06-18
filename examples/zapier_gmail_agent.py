@@ -100,13 +100,12 @@ if not zapier_mcp_url:
     print(f"Using example Zapier MCP URL: {zapier_mcp_url}")
 
 # Initialize Claude model and MCP client
-claude_model = AnthropicModel('claude-3-haiku-20240307', api_key=anthropic_api_key)
+claude_model = AnthropicModel('claude-sonnet-4-20250514')
 mcp_client = ZapierMCPClient(zapier_mcp_url)
 
 # Create Gmail agent
 gmail_agent = Agent(
     model=claude_model,
-    result_type=str,
     system_prompt="""You are a helpful Gmail assistant that can send emails through Zapier integration.
 
     When users want to send emails:
@@ -121,7 +120,7 @@ gmail_agent = Agent(
 )
 
 
-@gmail_agent.tool
+@gmail_agent.tool_plain
 def send_gmail_email(to_address: str, subject: str, message_body: str, cc_address: str = None) -> EmailResult:
     """Send an email through Zapier MCP Gmail integration"""
     
@@ -146,7 +145,7 @@ def send_gmail_email(to_address: str, subject: str, message_body: str, cc_addres
         )
 
 
-@gmail_agent.tool
+@gmail_agent.tool_plain
 def validate_email(email_address: str) -> dict:
     """Validate email address format"""
     import re
@@ -162,7 +161,7 @@ def validate_email(email_address: str) -> dict:
     }
 
 
-@gmail_agent.tool
+@gmail_agent.tool_plain
 def list_zapier_tools() -> dict:
     """List available tools from Zapier MCP server"""
     try:
