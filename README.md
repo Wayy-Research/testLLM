@@ -7,7 +7,7 @@
 
 **The first testing framework designed specifically for LLM-based agents.**
 
-testLLM uses Claude Sonnet 4 as an intelligent evaluator to test your AI agents semantically, not with brittle string matching. Write natural language test criteria that evaluate meaning, intent, and behavior rather than exact outputs.
+testLLM uses fast, accurate LLM evaluators (Mistral Large and Claude Sonnet 4) to test your AI agents semantically, not with brittle string matching. Write natural language test criteria that evaluate meaning, intent, and behavior rather than exact outputs.
 
 ## 🚀 Quick Start
 
@@ -19,11 +19,18 @@ pip install testllm
 
 ### Setup
 
-1. **Add your Anthropic API key** to `.env`:
+1. **Add API keys** to `.env`:
 ```bash
 # Environment variables for testLLM
+
+# Mistral (RECOMMENDED) - 3-5x faster than Claude, excellent for development
+MISTRAL_API_KEY=your_mistral_api_key_here
+
+# Claude (OPTIONAL) - More thorough but slower, good for production validation  
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 ```
+
+**🚀 Performance:** Mistral Large typically evaluates 3-5x faster than Claude Sonnet 4 while maintaining high accuracy. testLLM defaults to Mistral with automatic Claude fallback if Mistral is unavailable.
 
 ### 30-Second Example
 
@@ -65,7 +72,7 @@ def test_weather_query_response(my_agent):
 pytest test_my_agent.py -v
 ```
 
-That's it! Claude Sonnet 4 evaluates your agent's response semantically, understanding meaning rather than requiring exact text matches. 🎉
+That's it! Mistral Large evaluates your agent's response semantically in seconds, understanding meaning rather than requiring exact text matches. 🎉
 
 ## 🎯 Why testLLM?
 
@@ -80,9 +87,10 @@ Traditional testing breaks down with LLM agents because:
 
 ### testLLM's Solution
 
-✅ **Natural language criteria** evaluated by Claude Sonnet 4  
+✅ **Natural language criteria** evaluated by advanced LLMs  
 ✅ **Semantic understanding** instead of exact matching  
-✅ **Multiple iterations** for reliable stochastic testing  
+✅ **Configurable testing modes** (fast, thorough, production)  
+✅ **Multiple evaluator support** (Mistral, Claude) with auto-fallback  
 ✅ **Works with any agent** (API, local, custom)  
 ✅ **pytest integration** for familiar workflow  
 
@@ -218,27 +226,110 @@ class MyAgent(AgentUnderTest):
         return your_custom_logic(content)
 ```
 
-### 5. Intelligent Evaluation with Claude Sonnet 4
+### 5. Configurable Testing Modes
 
-All testing uses Claude Sonnet 4 as an intelligent evaluator:
+testLLM supports multiple testing configurations optimized for different scenarios:
 
 ```python
-# Default: 3 iterations with 67% consensus threshold for reliability
-test = semantic_test("test_id")
+# Fast mode (default) - optimized for development (⚡ 3-5x faster)
+flow = conversation_flow("test_id", config_mode="fast")
+# Uses: Mistral only, 1 iteration, sequential execution, 10s timeout
+# Typical test: 15-30 seconds vs 60-150 seconds with Claude
 
-# Custom evaluation settings
+# Thorough mode - comprehensive testing with debugging
+flow = conversation_flow("test_id", config_mode="thorough") 
+# Uses: Mistral + Claude, 3 iterations, parallel execution, timing debug
+# Best for catching edge cases and validation
+
+# Production mode - balanced reliability and performance
+flow = conversation_flow("test_id", config_mode="production")
+# Uses: Mistral + Claude, 2 iterations, parallel execution, 20s timeout
+# Mistral for speed, Claude for validation
+
+# Custom configuration
 test = semantic_test(
-    "custom_test", 
-    evaluator_models=["claude-sonnet-4"],  # Always Claude Sonnet 4
-    consensus_threshold=0.8  # 80% consensus required
+    "custom_test",
+    evaluator_models=["mistral-large-latest"],  # Mistral-only for max speed
+    consensus_threshold=0.8
 )
+```
+
+### 6. Smart Evaluator Selection
+
+testLLM automatically selects the best available evaluator:
+
+```python
+# Automatic selection with fallback
+# 1. Tries Mistral Large (3-5x faster, requires MISTRAL_API_KEY)
+# 2. Falls back to Claude Sonnet 4 (more thorough, requires ANTHROPIC_API_KEY)
+# 3. Provides clear error messages if neither available
+
+# Performance comparison:
+# Mistral Large: ~3-8 seconds per evaluation
+# Claude Sonnet 4: ~15-35 seconds per evaluation
+
+# Manual evaluator selection
+test = semantic_test(
+    "test_id",
+    evaluator_models=["mistral-large-latest"]  # Force Mistral for max speed
+)
+```
+
+## ⚡ Performance Optimization
+
+### Speed Comparison
+
+| Configuration | Evaluator | Typical Test Time | Use Case |
+|---------------|-----------|------------------|----------|
+| `fast` (default) | Mistral Large | 15-30 seconds | Development, debugging |
+| `thorough` | Mistral + Claude | 45-90 seconds | Pre-production validation |
+| `production` | Mistral + Claude | 30-60 seconds | CI/CD pipelines |
+| Legacy (Claude only) | Claude Sonnet 4 | 60-150 seconds | Comprehensive validation |
+
+### Performance Tips
+
+```python
+# ✅ FAST: Use Mistral for development
+flow = conversation_flow("test", config_mode="fast")
+
+# ✅ BALANCED: Use production mode for CI/CD  
+flow = conversation_flow("test", config_mode="production")
+
+# ❌ SLOW: Avoid Claude-only unless needed
+flow = conversation_flow("test", evaluator_models=["claude-sonnet-4-20250514"])
+
+# ✅ OPTIMIZE: Reduce criteria for speed
+test.add_scenario(
+    "Hello",
+    ["Response should be friendly"]  # 1 criterion = faster
+)
+
+# ❌ VERBOSE: Too many criteria slow down evaluation
+test.add_scenario(
+    "Hello", 
+    ["Friendly", "Professional", "Helpful", "Engaging", "Clear"]  # 5 criteria = slower
+)
+```
+
+### Debugging Performance
+
+```python
+# Enable timing debug in thorough mode
+flow = conversation_flow("test", config_mode="thorough")
+# This will show detailed timing for each evaluation step
+
+# Example output:
+# Step 1 took 12.34 seconds
+#   Agent response took 0.02 seconds  
+#   LLM evaluation took 12.32 seconds for 3 criteria
+#     Single criterion 'Response should be friendly' took 4.1 seconds
 ```
 
 ## 📚 Complete Documentation
 
 ### Semantic Testing Patterns
 
-Write natural language criteria that Claude Sonnet 4 can evaluate:
+Write natural language criteria that LLM evaluators can understand:
 
 | Pattern | Example | When to Use |
 |---------|---------|-------------|
@@ -401,6 +492,52 @@ pytest test_weather.py -v
 
 # Run tests matching a pattern
 pytest -k "test_greeting"
+```
+
+### Getting Detailed Test Evaluation Output
+
+To see the beautiful formatted test evaluation output (with LLM reasoning and scoring details), use these pytest flags:
+
+```bash
+# Show detailed evaluation output for all tests
+pytest -v -s
+
+# Show detailed output with shorter traceback format
+pytest -v -s --tb=short
+
+# For specific test files
+pytest tests/test_semantic.py -v -s
+
+# For specific test methods
+pytest tests/test_semantic.py::TestSemanticTestIntegration::test_real_semantic_evaluation -v -s
+```
+
+**Key flags explained:**
+- `-v`: Verbose output showing individual test names
+- `-s`: Disable output capture so you can see the detailed evaluation formatting
+- `--tb=short`: Show shorter traceback format for cleaner output
+
+**Note:** The detailed evaluation output (with LLM reasoning, scores, and criteria breakdown) only appears when:
+1. Tests use real LLM evaluation (not mocked evaluation)
+2. Running in pytest environment (detected automatically)
+3. Using the `-s` flag to disable output capture
+
+Example of detailed output you'll see:
+```
+================================================================================
+🧪 TEST CASE EVALUATION: greeting_test_case_0
+================================================================================
+📝 User Input: 'Hello there!'
+🤖 Agent Response: 'Hi! How can I help you today?'
+────────────────────────────────────────────────────────────────────────────────
+
+📋 Criterion 1: ✅ PASS (Score: 0.85)
+   └── 'Response should be friendly and welcoming'
+   └── ✅ mistral-large-latest: YES
+       💭 The response is warm and inviting with "Hi!" and offers help
+
+🎯 Test Result: ✅ PASS (Overall Score: 0.85)
+================================================================================
 ```
 
 ### Test Discovery

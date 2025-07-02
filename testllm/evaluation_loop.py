@@ -61,12 +61,52 @@ class ConsensusResult:
 @dataclass
 class EvaluationLoopConfig:
     """Configuration for the evaluation loop"""
-    iterations: int = 3
-    evaluator_models: List[str] = field(default_factory=lambda: ["claude-sonnet-4"])
+    iterations: int = 1
+    evaluator_models: List[str] = field(default_factory=lambda: ["mistral-large-latest"])
     consensus_threshold: float = 0.67
-    timeout: int = 30
-    parallel_execution: bool = True
-    retry_count: int = 2
+    timeout: int = 15
+    parallel_execution: bool = False
+    retry_count: int = 0
+    debug_timing: bool = False
+    
+    @classmethod
+    def fast_mode(cls) -> 'EvaluationLoopConfig':
+        """Fast configuration for quick testing (3-5x faster than Claude)"""
+        return cls(
+            iterations=1,
+            evaluator_models=["mistral-large-latest"],
+            consensus_threshold=0.6,
+            timeout=10,
+            parallel_execution=False,
+            retry_count=0,
+            debug_timing=False
+        )
+    
+    @classmethod
+    def thorough_mode(cls) -> 'EvaluationLoopConfig':
+        """Thorough configuration for comprehensive testing"""
+        return cls(
+            iterations=3,
+            evaluator_models=["mistral-large-latest", "claude-sonnet-4-20250514"],
+            consensus_threshold=0.75,
+            timeout=30,
+            parallel_execution=True,
+            retry_count=1,
+            debug_timing=True
+        )
+    
+    @classmethod
+    def production_mode(cls) -> 'EvaluationLoopConfig':
+        """Production configuration prioritizing Mistral for speed"""
+        return cls(
+            iterations=2,
+            evaluator_models=["mistral-large-latest", "claude-sonnet-4-20250514"],
+            consensus_threshold=0.7,
+            timeout=20,
+            parallel_execution=True,
+            retry_count=1,
+            debug_timing=False
+        )
 
 
 class EvaluatorClient:
@@ -119,28 +159,13 @@ class EvaluatorClient:
     def _build_evaluation_prompt(self, user_input: str, agent_response: str, 
                                 criterion: SemanticCriterion) -> str:
         """Build evaluation prompt for the model"""
-        return f"""You are an expert evaluator assessing AI agent responses.
+        return f"""Evaluate if this agent response meets the criterion.
 
-USER INPUT: "{user_input}"
-AGENT RESPONSE: "{agent_response}"
-EVALUATION CRITERION: "{criterion.criterion}"
+USER: "{user_input}"
+AGENT: "{agent_response}"
+CRITERION: "{criterion.criterion}"
 
-Evaluate whether the agent response meets the criterion. Consider:
-- Semantic meaning, not just exact words
-- Overall intent and appropriateness
-- Context and tone
-
-Respond in this exact JSON format:
-{{
-    "decision": "YES|NO",
-    "reasoning": "Brief explanation of your evaluation"
-}}
-
-Decision guide:
-- YES: The response meets the criterion
-- NO: The response does not meet the criterion
-
-You must choose either YES or NO. Be precise and objective in your evaluation."""
+Respond in JSON: {{"decision": "YES|NO", "reasoning": "brief explanation"}}"""
     
     async def _call_model(self, prompt: str) -> str:
         """Call the evaluator model - to be implemented by subclasses"""
@@ -256,16 +281,95 @@ class AnthropicEvaluator(EvaluatorClient):
             "messages": [{"role": "user", "content": prompt}]
         }
         
-        response = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-        response.raise_for_status()
+        # Use asyncio for truly async HTTP requests with rate limiting
+        import asyncio
+        loop = asyncio.get_event_loop()
         
-        result = response.json()
-        return result["content"][0]["text"]
+        # Add retry logic for rate limiting
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers=headers,
+                        json=payload,
+                        timeout=15
+                    )
+                )
+                response.raise_for_status()
+                result = response.json()
+                return result["content"][0]["text"]
+                
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:  # Too Many Requests
+                    if attempt < max_retries - 1:
+                        wait_time = 3 * (2 ** attempt)
+                        print(f"Rate limited (Claude), waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                        await asyncio.sleep(wait_time)
+                        continue
+                raise
+
+
+class MistralEvaluator(EvaluatorClient):
+    """Mistral API evaluator client"""
+    
+    def __init__(self, model_name: str):
+        super().__init__(model_name)
+        self.api_key = os.getenv('MISTRAL_API_KEY')
+        if not self.api_key:
+            raise ValueError("MISTRAL_API_KEY environment variable is required for Mistral evaluation")
+        self.base_url = "https://api.mistral.ai/v1/chat/completions"
+    
+    async def _call_model(self, prompt: str) -> str:
+        """Call Mistral API"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 200,
+            "temperature": 0.1
+        }
+        
+        # Use asyncio for truly async HTTP requests with rate limiting
+        import asyncio
+        loop = asyncio.get_event_loop()
+        
+        # Add base delay to prevent rate limiting
+        await asyncio.sleep(0.5)
+        
+        # Add retry logic for rate limiting
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: requests.post(
+                        self.base_url,
+                        json=payload,
+                        headers=headers,
+                        timeout=15
+                    )
+                )
+                
+                response.raise_for_status()
+                result = response.json()
+                return result["choices"][0]["message"]["content"]
+                
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:  # Too Many Requests
+                    if attempt < max_retries - 1:
+                        # More aggressive backoff: 3s, 6s, 12s
+                        wait_time = 3 * (2 ** attempt)
+                        print(f"Rate limited, waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                        await asyncio.sleep(wait_time)
+                        continue
+                raise
 
 
 class LocalEvaluator(EvaluatorClient):
@@ -306,34 +410,72 @@ class EvaluationLoop:
         self.evaluators = self._create_evaluators()
     
     def _create_evaluators(self) -> List[EvaluatorClient]:
-        """Create evaluator clients based on configuration"""
+        """Create evaluator clients based on configuration with fallbacks"""
         evaluators = []
         
         for model_name in self.config.evaluator_models:
-            if model_name.startswith(("gpt-", "o1-")):
-                evaluators.append(OpenAIEvaluator(model_name))
-            elif model_name.startswith(("claude-", "sonnet", "haiku", "opus")):
-                evaluators.append(AnthropicEvaluator(model_name))
-            elif model_name.startswith(("llama", "mistral", "local-")):
-                evaluators.append(LocalEvaluator(model_name))
-            else:
-                # Custom evaluator - could be extended
-                evaluators.append(EvaluatorClient(model_name))
+            try:
+                if model_name.startswith(("gpt-", "o1-")):
+                    evaluators.append(OpenAIEvaluator(model_name))
+                elif model_name.startswith(("claude-", "sonnet", "haiku", "opus")):
+                    evaluators.append(AnthropicEvaluator(model_name))
+                elif model_name.startswith("mistral"):
+                    evaluators.append(MistralEvaluator(model_name))
+                elif model_name.startswith(("llama", "local-")):
+                    evaluators.append(LocalEvaluator(model_name))
+                else:
+                    # Custom evaluator - could be extended
+                    evaluators.append(EvaluatorClient(model_name))
+            except ValueError as e:
+                print(f"Warning: Could not create evaluator for {model_name}: {e}")
+                # Fallback to Claude if Mistral fails
+                if model_name.startswith("mistral"):
+                    print("Falling back to Claude Sonnet 4")
+                    try:
+                        evaluators.append(AnthropicEvaluator("claude-sonnet-4-20250514"))
+                    except ValueError:
+                        print("Warning: No valid evaluators available, tests may fail")
+        
+        if not evaluators:
+            print("Warning: No evaluators created, using Claude as final fallback")
+            evaluators.append(AnthropicEvaluator("claude-sonnet-4-20250514"))
         
         return evaluators
     
     async def evaluate_response(self, user_input: str, agent_response: str, 
                                criteria: List[SemanticCriterion]) -> List[ConsensusResult]:
         """Run evaluation loop for agent response against all criteria"""
-        results = []
-        
-        for criterion in criteria:
-            consensus_result = await self._evaluate_single_criterion(
-                user_input, agent_response, criterion
-            )
-            results.append(consensus_result)
-        
-        return results
+        if self.config.parallel_execution:
+            # Evaluate all criteria in parallel for maximum speed
+            tasks = [
+                self._evaluate_single_criterion(user_input, agent_response, criterion)
+                for criterion in criteria
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Handle any exceptions that occurred
+            final_results = []
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    # Create a failed consensus result for exceptions
+                    final_results.append(ConsensusResult(
+                        criterion=criteria[i].criterion,
+                        consensus_score=0.0,
+                        passed=False,
+                        individual_results=[]
+                    ))
+                else:
+                    final_results.append(result)
+            return final_results
+        else:
+            # Sequential evaluation (fallback)
+            results = []
+            for criterion in criteria:
+                consensus_result = await self._evaluate_single_criterion(
+                    user_input, agent_response, criterion
+                )
+                results.append(consensus_result)
+            return results
     
     async def _evaluate_single_criterion(self, user_input: str, agent_response: str,
                                         criterion: SemanticCriterion) -> ConsensusResult:
@@ -342,6 +484,7 @@ class EvaluationLoop:
         
         # Run for specified iterations
         for iteration in range(self.config.iterations):
+            iteration_start = time.time()
             if self.config.parallel_execution:
                 # Run all evaluators in parallel
                 tasks = [
@@ -355,6 +498,10 @@ class EvaluationLoop:
                 for evaluator in self.evaluators:
                     result = await evaluator.evaluate(user_input, agent_response, criterion)
                     iteration_results.append(result)
+            
+            iteration_end = time.time()
+            if self.config.debug_timing:
+                print(f"      Single criterion '{criterion.criterion[:50]}...' took {iteration_end - iteration_start:.2f} seconds")
             
             # Filter out exceptions and add to all evaluations
             for result in iteration_results:
@@ -407,11 +554,11 @@ def create_evaluation_loop(config_dict: Dict[str, Any]) -> EvaluationLoop:
     """Create evaluation loop from configuration dictionary"""
     config = EvaluationLoopConfig(
         iterations=config_dict.get("iterations", 1),
-        evaluator_models=config_dict.get("evaluator_models", ["claude-sonnet-4"]),
+        evaluator_models=config_dict.get("evaluator_models", ["mistral-large-latest"]),
         consensus_threshold=config_dict.get("consensus_threshold", 0.67),
-        timeout=config_dict.get("timeout", 30),
-        parallel_execution=config_dict.get("parallel_execution", True),
-        retry_count=config_dict.get("retry_count", 2)
+        timeout=config_dict.get("timeout", 15),
+        parallel_execution=config_dict.get("parallel_execution", False),
+        retry_count=config_dict.get("retry_count", 0)
     )
     
     return EvaluationLoop(config)

@@ -2,6 +2,7 @@
 Conversation Flow Testing - Multi-step behavioral testing for production agents
 """
 
+import os
 import time
 from typing import Dict, List, Any, Optional, Union, Callable
 from dataclasses import dataclass, field
@@ -71,7 +72,8 @@ class ConversationFlow:
         flow_id: str,
         description: str = "",
         evaluator_models: Optional[List[str]] = None,
-        consensus_threshold: float = 0.7
+        consensus_threshold: float = 0.7,
+        config_mode: str = "fast"
     ):
         """
         Initialize a conversation flow test.
@@ -79,21 +81,30 @@ class ConversationFlow:
         Args:
             flow_id: Unique identifier for the flow
             description: Human-readable flow description
-            evaluator_models: LLM models for evaluation (default: claude-sonnet-4)
+            evaluator_models: LLM models for evaluation
             consensus_threshold: Minimum consensus score to pass
+            config_mode: Configuration mode ('fast', 'thorough', 'production')
         """
         self.flow_id = flow_id
         self.description = description
         self.steps: List[FlowStep] = []
         self.conversation_history: List[Dict[str, str]] = []
         
-        # Evaluation configuration
-        self.config = EvaluationLoopConfig(
-            evaluator_models=evaluator_models or ["claude-sonnet-4"],
-            consensus_threshold=consensus_threshold,
-            parallel_execution=True,
-            iterations=3
-        )
+        # Evaluation configuration based on mode
+        if config_mode == "fast":
+            self.config = EvaluationLoopConfig.fast_mode()
+        elif config_mode == "thorough":
+            self.config = EvaluationLoopConfig.thorough_mode()
+        elif config_mode == "production":
+            self.config = EvaluationLoopConfig.production_mode()
+        else:
+            self.config = EvaluationLoopConfig()
+        
+        # Override with custom parameters if provided
+        if evaluator_models:
+            self.config.evaluator_models = evaluator_models
+        if consensus_threshold != 0.7:
+            self.config.consensus_threshold = consensus_threshold
     
     def step(
         self, 
@@ -310,8 +321,10 @@ class ConversationFlow:
         steps_executed = 0
         
         try:
-            for step in self.steps:
+            for i, step in enumerate(self.steps):
+                step_start = time.time()
                 step_result = await self._execute_step(agent, step, evaluator)
+                step_end = time.time()
                 
                 if step_result:
                     step_results.append(step_result)
@@ -397,7 +410,9 @@ class ConversationFlow:
         
         try:
             # Get agent response
+            agent_start = time.time()
             agent_response = agent.send_message(step.user_input)
+            agent_end = time.time()
             
             # Build enhanced criteria including flow-specific checks
             enhanced_criteria = step.criteria.copy()
@@ -429,11 +444,13 @@ class ConversationFlow:
             ]
             
             # Evaluate with LLMs
+            eval_start = time.time()
             consensus_results = await evaluator.evaluate_response(
                 step.user_input,
                 agent_response,
                 semantic_criteria
             )
+            eval_end = time.time()
             
             # Calculate results
             passed = all(result.passed for result in consensus_results)
@@ -441,6 +458,10 @@ class ConversationFlow:
                 sum(result.consensus_score for result in consensus_results) 
                 / len(consensus_results) if consensus_results else 0.0
             )
+            
+            # Show detailed evaluation when running tests
+            if self._is_in_test_environment():
+                self._print_step_evaluation(step, agent_response, consensus_results, passed, overall_score)
             
             # Format criterion results
             criterion_results = []
@@ -562,13 +583,47 @@ class ConversationFlow:
             return 1.0
             
         return sum(r.overall_score for r in tool_steps) / len(tool_steps)
+    
+    def _print_step_evaluation(self, step: FlowStep, agent_response: str, consensus_results, passed: bool, overall_score: float):
+        """Print detailed evaluation results in a readable format"""
+        print(f"\n{'='*80}")
+        print(f"🔍 STEP EVALUATION: {step.step_id}")
+        print(f"📄 Flow: {self.description}" + (f" | {self.flow_id}" if self.description != self.flow_id else ""))
+        print(f"{'='*80}")
+        print(f"📝 User Input: '{step.user_input}'")
+        print(f"🤖 Agent Response: '{agent_response}'")
+        print(f"{'─'*80}")
+        
+        for i, result in enumerate(consensus_results):
+            status_icon = "✅" if result.passed else "❌"
+            status_text = "PASS" if result.passed else "FAIL"
+            print(f"\n📋 Criterion {i+1}: {status_icon} {status_text} (Score: {result.consensus_score:.2f})")
+            print(f"   └── '{result.criterion}'")
+            
+            if result.individual_results:
+                for eval_result in result.individual_results:
+                    decision_icon = "✅" if eval_result.decision == "YES" else "❌" if eval_result.decision == "NO" else "⚠️"
+                    print(f"   └── {decision_icon} {eval_result.evaluator_model}: {eval_result.decision}")
+                    print(f"       💭 {eval_result.reasoning}")
+        
+        print(f"\n{'─'*80}")
+        step_status_icon = "✅" if passed else "❌"
+        step_status_text = "PASS" if passed else "FAIL" 
+        print(f"🎯 Step Result: {step_status_icon} {step_status_text} (Overall Score: {overall_score:.2f})")
+        print(f"{'='*80}\n")
+    
+    def _is_in_test_environment(self) -> bool:
+        """Check if we're running in a pytest environment"""
+        import sys
+        return 'pytest' in sys.modules or 'PYTEST_CURRENT_TEST' in os.environ
 
 
 def conversation_flow(
     flow_id: str,
     description: str = "",
     evaluator_models: Optional[List[str]] = None,
-    consensus_threshold: float = 0.7
+    consensus_threshold: float = 0.7,
+    config_mode: str = "fast"
 ) -> ConversationFlow:
     """
     Factory function to create a conversation flow.
@@ -576,22 +631,27 @@ def conversation_flow(
     Args:
         flow_id: Unique identifier for the flow
         description: Human-readable flow description
-        evaluator_models: LLM models for evaluation (default: claude-sonnet-4)
+        evaluator_models: LLM models for evaluation
         consensus_threshold: Minimum consensus score to pass
+        config_mode: Configuration mode ('fast', 'thorough', 'production')
         
     Returns:
         ConversationFlow instance
         
-    Example:
+    Examples:
+        # Fast testing (default)
         flow = conversation_flow("onboarding", "Test user onboarding process")
-        flow.step(
-            "Hello, I'm new here",
-            criteria=["Response should begin onboarding process"]
-        )
+        
+        # Thorough testing with debugging
+        flow = conversation_flow("onboarding", config_mode="thorough")
+        
+        # Production testing
+        flow = conversation_flow("onboarding", config_mode="production")
     """
     return ConversationFlow(
         flow_id=flow_id,
         description=description,
         evaluator_models=evaluator_models,
-        consensus_threshold=consensus_threshold
+        consensus_threshold=consensus_threshold,
+        config_mode=config_mode
     )

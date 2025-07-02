@@ -64,12 +64,12 @@ class SemanticTest:
         self.description = description
         self.test_cases: List[SemanticTestCase] = []
         
-        # Evaluation configuration
+        # Evaluation configuration - defaults to fast mode with Mistral
         self.config = EvaluationLoopConfig(
-            evaluator_models=evaluator_models or ["claude-sonnet-4"],
+            evaluator_models=evaluator_models or ["mistral-large-latest"],
             consensus_threshold=consensus_threshold,
             parallel_execution=parallel_evaluation,
-            iterations=3
+            iterations=1  # Single iteration for speed
         )
     
     def add_scenario(self, user_input: str, criteria: List[str], **metadata) -> 'SemanticTest':
@@ -159,6 +159,10 @@ class SemanticTest:
                     / len(consensus_results) if consensus_results else 0.0
                 )
                 
+                # Print detailed evaluation results when running tests
+                if self._is_in_test_environment():
+                    self._print_test_evaluation(i, test_case, agent_response, consensus_results, passed, overall_score)
+                
                 # Format criterion results
                 criterion_results = []
                 for consensus_result in consensus_results:
@@ -217,6 +221,40 @@ class SemanticTest:
             List of test results for each test case
         """
         return asyncio.run(self.execute(agent))
+    
+    def _print_test_evaluation(self, test_index: int, test_case, agent_response: str, consensus_results, passed: bool, overall_score: float):
+        """Print detailed evaluation results in a readable format"""
+        print(f"\n{'='*80}")
+        print(f"🧪 TEST CASE EVALUATION: {self.test_id}_case_{test_index}")
+        print(f"📄 Test: {self.description}" + (f" | {self.test_id}" if self.description != self.test_id else ""))
+        print(f"{'='*80}")
+        print(f"📝 User Input: '{test_case.user_input}'")
+        print(f"🤖 Agent Response: '{agent_response}'")
+        print(f"{'─'*80}")
+        
+        for i, result in enumerate(consensus_results):
+            status_icon = "✅" if result.passed else "❌"
+            status_text = "PASS" if result.passed else "FAIL"
+            print(f"\n📋 Criterion {i+1}: {status_icon} {status_text} (Score: {result.consensus_score:.2f})")
+            print(f"   └── '{result.criterion}'")
+            
+            if result.individual_results:
+                for eval_result in result.individual_results:
+                    decision_icon = "✅" if eval_result.decision == "YES" else "❌" if eval_result.decision == "NO" else "⚠️"
+                    print(f"   └── {decision_icon} {eval_result.evaluator_model}: {eval_result.decision}")
+                    print(f"       💭 {eval_result.reasoning}")
+        
+        print(f"\n{'─'*80}")
+        test_status_icon = "✅" if passed else "❌"
+        test_status_text = "PASS" if passed else "FAIL" 
+        print(f"🎯 Test Result: {test_status_icon} {test_status_text} (Overall Score: {overall_score:.2f})")
+        print(f"{'='*80}\n")
+    
+    def _is_in_test_environment(self) -> bool:
+        """Check if we're running in a pytest environment"""
+        import sys
+        import os
+        return 'pytest' in sys.modules or 'PYTEST_CURRENT_TEST' in os.environ
 
 
 def semantic_test(

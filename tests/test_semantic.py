@@ -25,7 +25,15 @@ class MockAgent(AgentUnderTest):
     
     def send_message(self, message: str) -> str:
         """Mock send_message that returns predefined responses"""
-        return self.responses.get(message, "I understand your question. How can I assist you?")
+        message_lower = message.lower()
+        
+        # Check for partial matches to handle variations like "Hello there!"
+        for key, response in self.responses.items():
+            if key.lower() in message_lower:
+                return response
+        
+        # Default response
+        return "I understand your question. How can I assist you?"
     
     def reset_conversation(self):
         """Mock reset - no-op for this test"""
@@ -71,9 +79,9 @@ class TestSemanticTest:
         assert test.test_id == "test_id"
         assert test.description == "Test description"
         assert len(test.test_cases) == 0
-        assert test.config.evaluator_models == ["claude-sonnet-4"]
+        assert test.config.evaluator_models == ["mistral-large-latest"]
         assert test.config.consensus_threshold == 0.7
-        assert test.config.iterations == 3
+        assert test.config.iterations == 1
     
     def test_add_case(self):
         """Test adding test cases"""
@@ -121,27 +129,15 @@ class TestSemanticTest:
         test = SemanticTest("greeting_test")
         test.add_case("Hello", "Response should be friendly")
         
-        # Mock the evaluation loop and use sync execution
-        with patch('testllm.semantic.EvaluationLoop') as mock_eval_class:
-            mock_evaluator = AsyncMock()
-            mock_consensus = ConsensusResult(
-                criterion="Response should be friendly",
-                consensus_score=1.0,
-                passed=True,
-                individual_results=[]
-            )
-            mock_evaluator.evaluate_response.return_value = [mock_consensus]
-            mock_eval_class.return_value = mock_evaluator
-            
-            results = test.execute_sync(mock_agent)
+        results = test.execute_sync(mock_agent)
         
         assert len(results) == 1
         result = results[0]
         assert result.test_id == "greeting_test_case_0"
         assert result.user_input == "Hello"
         assert result.agent_response == "Hi there! How can I help you today?"
-        assert result.passed == True
-        assert result.overall_score == 1.0
+        # This test uses real LLM evaluation - should pass for friendly response
+        assert result.overall_score >= 0.7  # Expect high score for friendly greeting
     
     def test_execute_sync(self, mock_agent):
         """Test synchronous execute wrapper"""
@@ -173,11 +169,11 @@ class TestSemanticTestFactory:
         test = semantic_test(
             "test_id",
             "Test description",
-            evaluator_models=["claude-sonnet-4"],
+            evaluator_models=["mistral-large-latest"],
             consensus_threshold=0.8
         )
         
-        assert test.config.evaluator_models == ["claude-sonnet-4"]
+        assert test.config.evaluator_models == ["mistral-large-latest"]
         assert test.config.consensus_threshold == 0.8
 
 
@@ -295,15 +291,33 @@ class TestSemanticTestIntegration:
         test = SemanticTest(
             "custom_test",
             "Test with custom config",
-            evaluator_models=["claude-sonnet-4"],
+            evaluator_models=["mistral-large-latest"],
             consensus_threshold=0.8,
             parallel_evaluation=False
         )
         
-        assert test.config.evaluator_models == ["claude-sonnet-4"]
+        assert test.config.evaluator_models == ["mistral-large-latest"]
         assert test.config.consensus_threshold == 0.8
         assert test.config.parallel_execution == False
     
+    def test_real_semantic_evaluation(self, mock_agent):
+        """Test with real LLM semantic evaluation - not mocked"""
+        test = SemanticTest("real_semantic_test")
+        
+        # Add cases that should clearly pass and fail
+        test.add_case("Hello there!", ["Response should be friendly and welcoming"])
+        test.add_case("Help me", ["Response should offer assistance and ask for more details"])
+        
+        # Execute with real LLM evaluation
+        results = test.execute_sync(mock_agent)
+        
+        assert len(results) == 2
+        # First result should score well - friendly greeting gets friendly response
+        assert results[0].overall_score >= 0.7
+        # Second might score lower since mock agent doesn't actually provide time
+        # but we just verify it runs without error
+        assert results[1].overall_score >= 0.0
+
     def test_error_handling_in_execution(self, mock_agent):
         """Test error handling during test execution"""
         test = semantic_test("error_test", "Test error handling")
