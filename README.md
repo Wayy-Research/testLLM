@@ -9,7 +9,7 @@ test-llm uses fast, accurate LLM evaluators (Mistral Large and Claude Sonnet 4) 
 ### Installation
 
 ```bash
-pip install test-llm
+pip install testkitLLM
 ```
 
 ### Setup
@@ -418,7 +418,7 @@ The project uses GitHub Actions for continuous deployment:
 **Ready to test your LLM agents properly?** 
 
 ```bash
-pip install test-llm
+pip install testkitLLM
 ```
 
 Start building reliable AI systems today! 🚀
