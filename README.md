@@ -1,8 +1,8 @@
-# test-llm
+# testllm
 
 **The first testing framework designed specifically for LLM-based agents.**
 
-test-llm uses fast, accurate LLM evaluators (Mistral Large and Claude Sonnet 4) to test your AI agents semantically, not with brittle string matching. Write natural language test criteria that evaluate meaning, intent, and behavior rather than exact outputs.
+testllm uses fast, accurate LLM evaluators (Mistral Large and Claude Sonnet 4) to test your AI agents semantically, not with brittle string matching. Write natural language test criteria that evaluate meaning, intent, and behavior rather than exact outputs.
 
 ## 🚀 Quick Start
 
