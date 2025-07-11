@@ -12,7 +12,7 @@ with open(version_file) as f:
     exec(f.read())
 
 setup(
-    name="test-llm",
+    name="testkitLLM",
     version=__version__,
     description="Testing Framework for LLM-Based Agents",
     long_description=long_description,
