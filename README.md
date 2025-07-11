@@ -1,15 +1,15 @@
-# testLLM
+# test-llm
 
 **The first testing framework designed specifically for LLM-based agents.**
 
-testLLM uses fast, accurate LLM evaluators (Mistral Large and Claude Sonnet 4) to test your AI agents semantically, not with brittle string matching. Write natural language test criteria that evaluate meaning, intent, and behavior rather than exact outputs.
+test-llm uses fast, accurate LLM evaluators (Mistral Large and Claude Sonnet 4) to test your AI agents semantically, not with brittle string matching. Write natural language test criteria that evaluate meaning, intent, and behavior rather than exact outputs.
 
 ## 🚀 Quick Start
 
 ### Installation
 
 ```bash
-pip install testllm
+pip install test-llm
 ```
 
 ### Setup
@@ -418,7 +418,7 @@ The project uses GitHub Actions for continuous deployment:
 **Ready to test your LLM agents properly?** 
 
 ```bash
-pip install testllm
+pip install test-llm
 ```
 
 Start building reliable AI systems today! 🚀
