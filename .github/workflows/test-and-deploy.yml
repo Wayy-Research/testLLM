@@ -32,7 +32,8 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest tests/ -v --cov=testllm --cov-report=xml
+        # Run tests, skipping LLM-dependent integration tests in CI
+        pytest tests/ -v --cov=testllm --cov-report=xml -m "not integration"
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

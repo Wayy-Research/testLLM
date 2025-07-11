@@ -8,6 +8,10 @@ addopts = "-ra -q"
 testpaths = [
     "tests",
 ]
+markers = [
+    "integration: marks tests as integration tests that require LLM API keys",
+    "unit: marks tests as unit tests that don't require external dependencies",
+]
 
 [tool.black]
 line-length = 88

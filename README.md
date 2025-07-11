@@ -371,6 +371,48 @@ flow = conversation_flow("test", config_mode="production")
 - **GitHub Issues**: For bug reports and feature requests
 - **Documentation**: For detailed guides and examples
 
+## 🚀 Development & Release Process
+
+### Making a Release
+
+1. **Bump version and create release:**
+   ```bash
+   # For patch release (0.1.0 -> 0.1.1)
+   python scripts/bump_version.py patch
+   
+   # For minor release (0.1.0 -> 0.2.0)
+   python scripts/bump_version.py minor
+   
+   # For major release (0.1.0 -> 1.0.0)
+   python scripts/bump_version.py major
+   ```
+
+2. **Push changes and tag:**
+   ```bash
+   git push origin main
+   git push origin v0.1.1  # Replace with your version
+   ```
+
+3. **Create GitHub Release:**
+   - Go to https://github.com/Wayy-Research/testLLM/releases
+   - Click "Create a new release"
+   - Select your tag (e.g., v0.1.1)
+   - Add release notes
+   - Publish release
+
+This will automatically:
+- Run tests across Python 3.8-3.12
+- Deploy to TestPyPI on every push to main
+- Deploy to PyPI on GitHub releases
+
+### Continuous Deployment
+
+The project uses GitHub Actions for continuous deployment:
+
+- **Every push to main**: Automatically uploads to TestPyPI
+- **Every GitHub release**: Automatically uploads to PyPI
+- **All commits**: Run comprehensive tests
+
 ---
 
 **Ready to test your LLM agents properly?** 
