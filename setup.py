@@ -6,19 +6,24 @@ this_directory = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+# Read version from __version__.py
+version_file = os.path.join(this_directory, 'testllm', '__version__.py')
+with open(version_file) as f:
+    exec(f.read())
+
 setup(
     name="testllm",
-    version="0.1.0",
+    version=__version__,
     description="Testing Framework for LLM-Based Agents",
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="testLLM Team",
-    author_email="YOUR_CONTACT_EMAIL",
-    url="YOUR_GITHUB_URL",
+    author_email="rcgalbo@gmail.com",
+    url="https://github.com/rcgalbo/wayy-research",
     project_urls={
-        "Bug Tracker": "YOUR_GITHUB_URL/issues",
-        "Documentation": "YOUR_DOCS_URL",
-        "Source Code": "YOUR_GITHUB_URL",
+        "Bug Tracker": "https://github.com/rcgalbo/wayy-research/issues",
+        "Documentation": "https://github.com/rcgalbo/wayy-research/blob/main/README.md",
+        "Source Code": "https://github.com/rcgalbo/wayy-research",
     },
     packages=find_packages(exclude=["tests*", "examples*"]),
     include_package_data=True,
