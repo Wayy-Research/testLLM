@@ -32,8 +32,8 @@ jobs:
     
     - name: Run tests
       run: |
-        # Run tests, skipping LLM-dependent integration tests in CI
-        pytest tests/ -v --cov=testllm --cov-report=xml -m "not integration"
+        # Run core tests that don't require LLM API keys
+        pytest tests/test_behavioral.py tests/test_mock_agent.py tests/test_simple.py tests/test_yaml_definitions.py -v --cov=testllm --cov-report=xml
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

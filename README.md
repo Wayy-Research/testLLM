@@ -411,7 +411,7 @@ The project uses GitHub Actions for continuous deployment:
 
 - **Every push to main**: Automatically uploads to TestPyPI
 - **Every GitHub release**: Automatically uploads to PyPI
-- **All commits**: Run comprehensive tests
+- **All commits**: Run core tests (full test suite runs locally with API keys)
 
 ---
 
