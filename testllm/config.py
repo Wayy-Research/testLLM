@@ -12,8 +12,8 @@ class CloudConfig:
     """Configuration for testLLM cloud services"""
     
     # Dashboard API endpoints
-    dashboard_url: str = "https://dashboard.testllm.com"
-    api_base_url: str = "https://dashboard.testllm.com/api"
+    dashboard_url: str = "http://localhost:3000"
+    api_base_url: str = "http://localhost:3000/api"
     
     # Authentication
     api_key: Optional[str] = None
