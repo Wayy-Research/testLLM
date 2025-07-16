@@ -11,6 +11,10 @@ from abc import ABC, abstractmethod
 
 import requests
 
+# Import telemetry components
+from .telemetry import get_telemetry_collector, start_session, end_session, get_session_url
+from .config import get_config
+
 
 @dataclass
 class SemanticTestResult:
@@ -195,6 +199,25 @@ class SemanticTest:
         )
         evaluator = EvaluationLoop(config)
         
+        # Start telemetry session
+        telemetry_config = get_config()
+        session_id = None
+        if telemetry_config.telemetry_enabled:
+            try:
+                session_id = start_session(
+                    session_name=f"semantic_test_{self.test_id}",
+                    agent_type=type(agent).__name__,
+                    metadata={
+                        "test_id": self.test_id,
+                        "description": self.description,
+                        "evaluator_models": self.evaluator_models,
+                        "num_test_cases": len(self.test_cases)
+                    }
+                )
+            except Exception as e:
+                if telemetry_config.debug_mode:
+                    print(f"Failed to start telemetry session: {e}")
+        
         results = []
         agent.reset_conversation()
         
@@ -246,6 +269,27 @@ class SemanticTest:
                 
                 results.append(result)
                 
+                # Record telemetry
+                if session_id and telemetry_config.telemetry_enabled:
+                    try:
+                        from .telemetry import record_test_result
+                        record_test_result(
+                            test_id=result.test_id,
+                            test_type="semantic",
+                            passed=result.passed,
+                            overall_score=result.consensus_score,
+                            execution_time=result.execution_time,
+                            user_input=result.user_input,
+                            agent_response=result.agent_response,
+                            criteria=result.test_criteria,
+                            evaluations=result.evaluation_results,
+                            errors=result.errors,
+                            metadata={"test_case_index": len(results) - 1}
+                        )
+                    except Exception as e:
+                        if telemetry_config.debug_mode:
+                            print(f"Failed to record telemetry: {e}")
+                
             except Exception as e:
                 error_result = SemanticTestResult(
                     test_id=f"{self.test_id}_{len(results)}",
@@ -258,6 +302,38 @@ class SemanticTest:
                     execution_time=time.time() - start_time
                 )
                 results.append(error_result)
+                
+                # Record telemetry for error case
+                if session_id and telemetry_config.telemetry_enabled:
+                    try:
+                        from .telemetry import record_test_result
+                        record_test_result(
+                            test_id=error_result.test_id,
+                            test_type="semantic",
+                            passed=False,
+                            overall_score=0.0,
+                            execution_time=error_result.execution_time,
+                            user_input=error_result.user_input,
+                            agent_response=error_result.agent_response,
+                            criteria=error_result.test_criteria,
+                            evaluations=[],
+                            errors=error_result.errors,
+                            metadata={"test_case_index": len(results) - 1}
+                        )
+                    except Exception as te:
+                        if telemetry_config.debug_mode:
+                            print(f"Failed to record telemetry for error case: {te}")
+        
+        # End telemetry session
+        if session_id and telemetry_config.telemetry_enabled:
+            try:
+                end_session(session_id)
+                # Print dashboard URL for user
+                dashboard_url = get_session_url(session_id)
+                print(f"📊 View detailed results: {dashboard_url}")
+            except Exception as e:
+                if telemetry_config.debug_mode:
+                    print(f"Failed to end telemetry session: {e}")
         
         return results
 
