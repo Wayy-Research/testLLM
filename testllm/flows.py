@@ -4,7 +4,7 @@ Conversation Flow Testing - Multi-step behavioral testing for production agents
 
 import os
 import time
-from typing import Dict, List, Any, Optional, Union, Callable
+from typing import Dict, List, Any, Optional, Union, Callable, TYPE_CHECKING
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -12,13 +12,17 @@ from .core import AgentUnderTest
 from .semantic import SemanticTest, SemanticTestResult
 from .evaluation_loop import EvaluationLoop, EvaluationLoopConfig, SemanticCriterion
 
+if TYPE_CHECKING:
+    from .tool_testing import ToolExpectations, ToolExpectationSummary
+
 
 class FlowStepType(Enum):
     """Types of flow steps"""
     USER_INPUT = "user_input"
-    SYSTEM_CHECK = "system_check" 
+    SYSTEM_CHECK = "system_check"
     CONDITIONAL = "conditional"
     PARALLEL = "parallel"
+    TOOL_STEP = "tool_step"
 
 
 @dataclass
@@ -29,12 +33,15 @@ class FlowStep:
     user_input: Optional[str] = None
     criteria: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Behavioral expectations
     expect_context_retention: bool = False
     expect_tool_usage_indicators: List[str] = field(default_factory=list)
     expect_business_logic: List[str] = field(default_factory=list)
-    
+
+    # Tool expectations (for tool_step type)
+    tool_expectations: Optional['ToolExpectations'] = None
+
     # Flow control
     conditional_check: Optional[Callable] = None
     parallel_steps: List['FlowStep'] = field(default_factory=list)
@@ -52,11 +59,14 @@ class FlowResult:
     execution_time: float
     step_results: List[SemanticTestResult] = field(default_factory=list)
     flow_errors: List[str] = field(default_factory=list)
-    
+
     # Flow-specific metrics
     context_retention_score: float = 0.0
     business_logic_score: float = 0.0
     tool_usage_score: float = 0.0
+
+    # Tool expectation results
+    tool_expectation_results: List['ToolExpectationSummary'] = field(default_factory=list)
 
 
 class ConversationFlow:
@@ -298,7 +308,89 @@ class ConversationFlow:
             step_id=step_id,
             expect_business_logic=business_rules
         )
-    
+
+    def tool_step(
+        self,
+        user_input: str,
+        criteria: List[str],
+        tool_expectations: 'ToolExpectations',
+        step_id: Optional[str] = None,
+        **metadata
+    ) -> 'ConversationFlow':
+        """
+        Add a step with explicit tool expectations.
+
+        This method allows you to define precise expectations for tool calls,
+        including argument validation, call counts, and mock responses.
+
+        Args:
+            user_input: Input that should trigger tool usage
+            criteria: Semantic criteria for evaluating the response
+            tool_expectations: ToolExpectations object defining expected tool behavior
+            step_id: Optional step identifier
+            **metadata: Additional step metadata
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            from testllm.tool_testing import expect_tools
+
+            flow.tool_step(
+                "Find flights to NYC",
+                criteria=["Should present flight options"],
+                tool_expectations=expect_tools()
+                    .expect_call("search_flights")
+                    .with_arguments_containing(destination="NYC")
+                    .returning({"flights": [{"id": "F1", "price": 299}]})
+            )
+        """
+        step_id = step_id or f"tool_step_{len(self.steps) + 1}"
+
+        step = FlowStep(
+            step_id=step_id,
+            step_type=FlowStepType.TOOL_STEP,
+            user_input=user_input,
+            criteria=criteria,
+            tool_expectations=tool_expectations,
+            metadata=metadata
+        )
+
+        self.steps.append(step)
+        return self
+
+    def with_tool_expectations(
+        self,
+        tool_expectations: 'ToolExpectations'
+    ) -> 'ConversationFlow':
+        """
+        Add tool expectations to the most recently added step.
+
+        This allows attaching tool expectations to any step type.
+
+        Args:
+            tool_expectations: ToolExpectations object defining expected tool behavior
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            from testllm.tool_testing import expect_tools
+
+            flow.step(
+                "Book flight F1",
+                criteria=["Should confirm booking"]
+            ).with_tool_expectations(
+                expect_tools()
+                    .expect_call("book_flight")
+                    .with_arguments_containing(flight_id="F1")
+                    .times(1)
+            )
+        """
+        if self.steps:
+            self.steps[-1].tool_expectations = tool_expectations
+        return self
+
     async def execute(self, agent: AgentUnderTest) -> FlowResult:
         """
         Execute the conversation flow against the agent.

@@ -23,8 +23,9 @@ from .core import AgentUnderTest
 
 class EvaluatorType(Enum):
     """Types of evaluator models"""
-    OPENAI = "openai"
+    GEMINI = "gemini"
     ANTHROPIC = "anthropic"
+    MISTRAL = "mistral"
     LOCAL = "local"
     CUSTOM = "custom"
 
@@ -62,16 +63,35 @@ class ConsensusResult:
 class EvaluationLoopConfig:
     """Configuration for the evaluation loop"""
     iterations: int = 1
-    evaluator_models: List[str] = field(default_factory=lambda: ["mistral-large-latest"])
+    evaluator_models: List[str] = field(default_factory=lambda: ["gemini-2.0-flash"])  # Gemini free tier
     consensus_threshold: float = 0.67
-    timeout: int = 15
+    timeout: int = 30
     parallel_execution: bool = False
     retry_count: int = 0
     debug_timing: bool = False
-    
+
+    @classmethod
+    def default_mode(cls) -> 'EvaluationLoopConfig':
+        """
+        Default configuration using Gemini (free tier, no credit card required).
+
+        Get your free API key at: https://aistudio.google.com/apikey
+        Then set: export GOOGLE_API_KEY='your-key-here'
+        Or run: python -m testllm.setup
+        """
+        return cls(
+            iterations=1,
+            evaluator_models=["gemini-2.0-flash"],
+            consensus_threshold=0.6,
+            timeout=30,
+            parallel_execution=False,
+            retry_count=1,
+            debug_timing=False
+        )
+
     @classmethod
     def fast_mode(cls) -> 'EvaluationLoopConfig':
-        """Fast configuration for quick testing (3-5x faster than Claude)"""
+        """Fast configuration using Mistral (requires MISTRAL_API_KEY)"""
         return cls(
             iterations=1,
             evaluator_models=["mistral-large-latest"],
@@ -81,26 +101,26 @@ class EvaluationLoopConfig:
             retry_count=0,
             debug_timing=False
         )
-    
+
     @classmethod
     def thorough_mode(cls) -> 'EvaluationLoopConfig':
-        """Thorough configuration for comprehensive testing"""
+        """Thorough configuration for comprehensive testing (requires API keys)"""
         return cls(
             iterations=3,
-            evaluator_models=["mistral-large-latest", "claude-sonnet-4-20250514"],
+            evaluator_models=["gemini-2.0-flash", "claude-sonnet-4-20250514"],
             consensus_threshold=0.75,
             timeout=30,
             parallel_execution=True,
             retry_count=1,
             debug_timing=True
         )
-    
+
     @classmethod
     def production_mode(cls) -> 'EvaluationLoopConfig':
-        """Production configuration prioritizing Mistral for speed"""
+        """Production configuration with multiple evaluators (requires API keys)"""
         return cls(
             iterations=2,
-            evaluator_models=["mistral-large-latest", "claude-sonnet-4-20250514"],
+            evaluator_models=["gemini-2.0-flash", "claude-sonnet-4-20250514"],
             consensus_threshold=0.7,
             timeout=20,
             parallel_execution=True,
@@ -118,11 +138,13 @@ class EvaluatorClient:
     
     def _detect_evaluator_type(self, model_name: str) -> EvaluatorType:
         """Detect evaluator type from model name"""
-        if model_name.startswith(("gpt-", "o1-")):
-            return EvaluatorType.OPENAI
+        if model_name.startswith("gemini"):
+            return EvaluatorType.GEMINI
         elif model_name.startswith(("claude-", "sonnet", "haiku", "opus")):
             return EvaluatorType.ANTHROPIC
-        elif model_name.startswith(("llama", "mistral", "local-")):
+        elif model_name.startswith("mistral"):
+            return EvaluatorType.MISTRAL
+        elif model_name.startswith(("llama", "local-")):
             return EvaluatorType.LOCAL
         else:
             return EvaluatorType.CUSTOM
@@ -211,46 +233,6 @@ Respond in JSON: {{"decision": "YES|NO", "reasoning": "brief explanation"}}"""
             "confidence": confidence,
             "reasoning": "Parsed from non-JSON response"
         }
-
-
-class OpenAIEvaluator(EvaluatorClient):
-    """OpenAI model evaluator"""
-    
-    def __init__(self, model_name: str, api_key: Optional[str] = None):
-        super().__init__(model_name)
-        self.api_key = api_key or self._get_api_key()
-    
-    def _get_api_key(self) -> str:
-        return os.getenv("OPENAI_API_KEY", "")
-    
-    async def _call_model(self, prompt: str) -> str:
-        """Call OpenAI API"""
-        if not self.api_key:
-            raise ValueError("OpenAI API key not provided")
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "model": self.model_name,
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1,
-            "max_tokens": 200
-        }
-        
-        # Use requests for now - could be made async with aiohttp
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=30
-        )
-        response.raise_for_status()
-        
-        result = response.json()
-        return result["choices"][0]["message"]["content"]
 
 
 class AnthropicEvaluator(EvaluatorClient):
@@ -374,11 +356,11 @@ class MistralEvaluator(EvaluatorClient):
 
 class LocalEvaluator(EvaluatorClient):
     """Local model evaluator (e.g., Ollama)"""
-    
+
     def __init__(self, model_name: str, endpoint: str = "http://localhost:11434"):
         super().__init__(model_name)
         self.endpoint = endpoint
-    
+
     async def _call_model(self, prompt: str) -> str:
         """Call local model via Ollama API"""
         payload = {
@@ -390,16 +372,75 @@ class LocalEvaluator(EvaluatorClient):
                 "num_predict": 200
             }
         }
-        
+
         response = requests.post(
             f"{self.endpoint}/api/generate",
             json=payload,
             timeout=60
         )
         response.raise_for_status()
-        
+
         result = response.json()
         return result["response"]
+
+
+class GeminiEvaluator(EvaluatorClient):
+    """
+    Google Gemini evaluator using Google AI Studio API.
+
+    Free tier available with no credit card required.
+    Get your API key at: https://aistudio.google.com/apikey
+    """
+
+    def __init__(self, model_name: str = "gemini-2.0-flash"):
+        super().__init__(model_name)
+        self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if not self.api_key:
+            raise ValueError(
+                "Google API key not found. Get a free key at: https://aistudio.google.com/apikey\n"
+                "Then set: export GOOGLE_API_KEY='your-key-here'\n"
+                "Or run: python -m testllm.setup"
+            )
+        self.endpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    async def _call_model(self, prompt: str) -> str:
+        """Call Google Gemini API"""
+        import asyncio
+        loop = asyncio.get_event_loop()
+
+        url = f"{self.endpoint}/{self.model_name}:generateContent?key={self.api_key}"
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 200
+            }
+        }
+
+        try:
+            response = await loop.run_in_executor(
+                None,
+                lambda: requests.post(
+                    url,
+                    json=payload,
+                    timeout=30
+                )
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            # Extract text from Gemini response
+            candidates = result.get("candidates", [])
+            if candidates:
+                content = candidates[0].get("content", {})
+                parts = content.get("parts", [])
+                if parts:
+                    return parts[0].get("text", "")
+            return ""
+
+        except requests.exceptions.RequestException as e:
+            raise ValueError(f"Gemini API error: {str(e)}")
 
 
 class EvaluationLoop:
@@ -412,11 +453,12 @@ class EvaluationLoop:
     def _create_evaluators(self) -> List[EvaluatorClient]:
         """Create evaluator clients based on configuration with fallbacks"""
         evaluators = []
-        
+
         for model_name in self.config.evaluator_models:
             try:
-                if model_name.startswith(("gpt-", "o1-")):
-                    evaluators.append(OpenAIEvaluator(model_name))
+                if model_name.startswith("gemini"):
+                    # Google Gemini - free tier available
+                    evaluators.append(GeminiEvaluator(model_name))
                 elif model_name.startswith(("claude-", "sonnet", "haiku", "opus")):
                     evaluators.append(AnthropicEvaluator(model_name))
                 elif model_name.startswith("mistral"):
@@ -424,22 +466,26 @@ class EvaluationLoop:
                 elif model_name.startswith(("llama", "local-")):
                     evaluators.append(LocalEvaluator(model_name))
                 else:
-                    # Custom evaluator - could be extended
-                    evaluators.append(EvaluatorClient(model_name))
+                    # Default to Gemini for unknown models
+                    evaluators.append(GeminiEvaluator("gemini-2.0-flash"))
             except ValueError as e:
-                print(f"Warning: Could not create evaluator for {model_name}: {e}")
-                # Fallback to Claude if Mistral fails
-                if model_name.startswith("mistral"):
-                    print("Falling back to Claude Sonnet 4")
-                    try:
-                        evaluators.append(AnthropicEvaluator("claude-sonnet-4-20250514"))
-                    except ValueError:
-                        print("Warning: No valid evaluators available, tests may fail")
-        
+                print(f"\n⚠️  Could not create evaluator for {model_name}:")
+                print(f"   {e}\n")
+
         if not evaluators:
-            print("Warning: No evaluators created, using Claude as final fallback")
-            evaluators.append(AnthropicEvaluator("claude-sonnet-4-20250514"))
-        
+            # No evaluators could be created - show setup instructions
+            print("\n" + "=" * 60)
+            print("❌ No evaluators available - testLLM needs an API key to run")
+            print("=" * 60)
+            print("\nQuick setup (1 minute, free, no credit card):\n")
+            print("  1. Visit: https://aistudio.google.com/apikey")
+            print("  2. Sign in with Google and click 'Create API Key'")
+            print("  3. Set the environment variable:")
+            print("     export GOOGLE_API_KEY='your-key-here'\n")
+            print("Or run: python -m testllm.setup")
+            print("=" * 60 + "\n")
+            raise ValueError("No evaluator API keys configured. Run: python -m testllm.setup")
+
         return evaluators
     
     async def evaluate_response(self, user_input: str, agent_response: str, 
@@ -554,11 +600,11 @@ def create_evaluation_loop(config_dict: Dict[str, Any]) -> EvaluationLoop:
     """Create evaluation loop from configuration dictionary"""
     config = EvaluationLoopConfig(
         iterations=config_dict.get("iterations", 1),
-        evaluator_models=config_dict.get("evaluator_models", ["mistral-large-latest"]),
+        evaluator_models=config_dict.get("evaluator_models", ["gemini-2.0-flash"]),
         consensus_threshold=config_dict.get("consensus_threshold", 0.67),
-        timeout=config_dict.get("timeout", 15),
+        timeout=config_dict.get("timeout", 30),
         parallel_execution=config_dict.get("parallel_execution", False),
         retry_count=config_dict.get("retry_count", 0)
     )
-    
+
     return EvaluationLoop(config)

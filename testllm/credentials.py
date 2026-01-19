@@ -37,20 +37,22 @@ def get_api_key(service: str, key_name: Optional[str] = None) -> Optional[str]:
     Get API key for a service with .env file support
     
     Args:
-        service: Service name (e.g., 'openai', 'anthropic')
+        service: Service name (e.g., 'google', 'anthropic', 'mistral')
         key_name: Override the default environment variable name
-    
+
     Returns:
         API key if found, None otherwise
     """
     # Load .env file if available
     load_dotenv_if_available()
-    
+
     # Default key names for common services
     default_keys = {
-        'openai': 'OPENAI_API_KEY',
+        'google': 'GOOGLE_API_KEY',
+        'gemini': 'GOOGLE_API_KEY',  # Alias for google
         'anthropic': 'ANTHROPIC_API_KEY',
         'claude': 'ANTHROPIC_API_KEY',  # Alias for anthropic
+        'mistral': 'MISTRAL_API_KEY',
         'together': 'TOGETHER_API_KEY',
         'replicate': 'REPLICATE_API_TOKEN',
         'huggingface': 'HUGGINGFACE_API_TOKEN',
@@ -78,8 +80,9 @@ def get_all_api_keys() -> Dict[str, str]:
     
     # Check for common API keys
     key_mappings = {
-        'openai': 'OPENAI_API_KEY',
+        'google': 'GOOGLE_API_KEY',
         'anthropic': 'ANTHROPIC_API_KEY',
+        'mistral': 'MISTRAL_API_KEY',
         'together': 'TOGETHER_API_KEY',
         'replicate': 'REPLICATE_API_TOKEN',
         'huggingface': 'HUGGINGFACE_API_TOKEN',
@@ -110,12 +113,14 @@ def validate_credentials_for_models(model_names: list) -> Dict[str, bool]:
     
     for model in model_names:
         model_lower = model.lower()
-        
-        if model_lower.startswith(('gpt-', 'o1-')):
-            results[model] = bool(get_api_key('openai'))
+
+        if model_lower.startswith(('gemini-', 'gemini')):
+            results[model] = bool(get_api_key('google'))
         elif model_lower.startswith(('claude-', 'sonnet', 'haiku', 'opus')):
             results[model] = bool(get_api_key('anthropic'))
-        elif model_lower.startswith(('llama', 'mistral', 'local-')):
+        elif model_lower.startswith(('mistral-',)):
+            results[model] = bool(get_api_key('mistral'))
+        elif model_lower.startswith(('llama', 'local-')):
             # Local models don't need credentials
             results[model] = True
         else:
@@ -142,9 +147,11 @@ def ensure_credentials(service: str, key_name: Optional[str] = None) -> str:
     api_key = get_api_key(service, key_name)
     if not api_key:
         env_var = key_name or {
-            'openai': 'OPENAI_API_KEY',
+            'google': 'GOOGLE_API_KEY',
+            'gemini': 'GOOGLE_API_KEY',
             'anthropic': 'ANTHROPIC_API_KEY',
             'claude': 'ANTHROPIC_API_KEY',
+            'mistral': 'MISTRAL_API_KEY',
         }.get(service.lower(), f"{service.upper()}_API_KEY")
         
         raise ValueError(

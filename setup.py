@@ -52,6 +52,9 @@ setup(
         "pytest11": [
             "testllm = testllm.pytest_plugin",
         ],
+        "console_scripts": [
+            "testllm-setup = testllm.setup:main",
+        ],
     },
     classifiers=[
         "Development Status :: 4 - Beta",

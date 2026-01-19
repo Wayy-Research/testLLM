@@ -503,6 +503,154 @@ class AgentAssertion:
         return TokenCountAssertion(max_tokens)
 
 
+class InterceptedAgent(AgentUnderTest):
+    """
+    Wrapper that intercepts tool calls made by an agent.
+
+    This wrapper integrates with the tool testing framework to:
+    - Record all tool calls made by the wrapped agent
+    - Optionally mock tool responses
+    - Validate tool call arguments
+    - Support testing of tool sequences
+
+    Example:
+        from testllm.tool_testing import ToolInterceptor
+
+        interceptor = ToolInterceptor()
+        interceptor.register_mock("search_flights", {"flights": [...]})
+
+        agent = InterceptedAgent(my_agent, interceptor)
+        response = agent.send_message("Find flights to NYC")
+
+        # Check what tools were called
+        calls = agent.get_tool_calls()
+        assert "search_flights" in [c["tool_name"] for c in calls]
+    """
+
+    def __init__(
+        self,
+        wrapped_agent: AgentUnderTest,
+        interceptor: Optional[Any] = None
+    ):
+        """
+        Initialize an intercepted agent.
+
+        Args:
+            wrapped_agent: The agent to wrap
+            interceptor: Optional ToolInterceptor instance for mocking/recording
+        """
+        self.wrapped_agent = wrapped_agent
+        self._interceptor = interceptor
+        self._intercepted_calls: List[Dict[str, Any]] = []
+
+    @property
+    def interceptor(self):
+        """Get the interceptor instance"""
+        return self._interceptor
+
+    @interceptor.setter
+    def interceptor(self, value):
+        """Set the interceptor instance"""
+        self._interceptor = value
+
+    def send_message(self, content: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Send a message to the wrapped agent, intercepting tool calls.
+
+        Args:
+            content: Message content
+            context: Optional context dict
+
+        Returns:
+            Agent response string
+        """
+        # Get response from wrapped agent
+        response = self.wrapped_agent.send_message(content, context)
+
+        # If wrapped agent has tool calls, intercept them
+        if hasattr(self.wrapped_agent, 'get_tool_calls'):
+            raw_calls = self.wrapped_agent.get_tool_calls()
+
+            # Parse and record calls through interceptor
+            if self._interceptor and raw_calls:
+                from .tool_testing import AutoAdapter, ToolCall
+
+                for raw_call in raw_calls:
+                    # Parse the call
+                    if isinstance(raw_call, ToolCall):
+                        tool_call = raw_call
+                    else:
+                        tool_call = AutoAdapter.parse_call(raw_call)
+
+                    # Check if we should mock the response
+                    mock_response = self._interceptor.intercept(tool_call)
+
+                    # Record the call
+                    self._intercepted_calls.append(tool_call.to_dict())
+
+        return response
+
+    def reset_conversation(self) -> None:
+        """Reset conversation state for both wrapper and wrapped agent"""
+        self.wrapped_agent.reset_conversation()
+        self._intercepted_calls.clear()
+        if self._interceptor:
+            self._interceptor.clear()
+
+    def get_tool_calls(self) -> List[Dict[str, Any]]:
+        """
+        Get all intercepted tool calls.
+
+        Returns:
+            List of tool call dicts with tool_name, arguments, etc.
+        """
+        # Combine intercepted calls with any from wrapped agent
+        if self._intercepted_calls:
+            return self._intercepted_calls.copy()
+
+        # Fall back to wrapped agent's tool calls
+        if hasattr(self.wrapped_agent, 'get_tool_calls'):
+            return self.wrapped_agent.get_tool_calls()
+
+        return []
+
+    def get_interceptor_calls(self) -> List[Any]:
+        """
+        Get detailed intercepted calls from the interceptor.
+
+        Returns:
+            List of InterceptedCall objects if interceptor is set
+        """
+        if self._interceptor and hasattr(self._interceptor, 'get_intercepted_calls'):
+            return self._interceptor.get_intercepted_calls()
+        return []
+
+    def verify_expectations(self, expectations: Any) -> Any:
+        """
+        Verify tool calls against expectations.
+
+        Args:
+            expectations: ToolExpectations object
+
+        Returns:
+            ToolExpectationSummary with verification results
+        """
+        from .tool_testing import AutoAdapter, ToolCall
+
+        # Get all tool calls
+        raw_calls = self.get_tool_calls()
+        tool_calls = []
+
+        for raw_call in raw_calls:
+            if isinstance(raw_call, ToolCall):
+                tool_calls.append(raw_call)
+            else:
+                tool_calls.append(AutoAdapter.parse_call(raw_call))
+
+        # Verify against expectations
+        return expectations.verify(tool_calls)
+
+
 # Legacy YAML support functions - kept for backwards compatibility
 def load_test_file(file_path: str) -> Dict[str, Any]:
     """Load test definitions from a YAML file (legacy)"""

@@ -16,6 +16,16 @@
 
 If you want to test with real LLM APIs:
 
+### Quick Setup (Recommended)
+
+1. **Run the interactive setup**:
+   ```bash
+   python -m testllm.setup
+   ```
+   This will guide you through getting a free Google API key (no credit card required).
+
+### Manual Setup
+
 1. **Create a `.env` file** (copy from `.env.example`):
    ```bash
    cp .env.example .env
@@ -23,8 +33,9 @@ If you want to test with real LLM APIs:
 
 2. **Add your API keys** to `.env`:
    ```
-   OPENAI_API_KEY=your_openai_api_key_here
+   GOOGLE_API_KEY=your_google_api_key_here
    ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   MISTRAL_API_KEY=your_mistral_api_key_here
    ```
 
 3. **Run tests with real agents**:
